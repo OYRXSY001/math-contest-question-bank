@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
@@ -70,9 +71,42 @@ class PublicPageTests(TestCase):
             404,
         )
 
+    def test_paper_detail_with_uploaded_pdf_renders_before_download_route_exists(self):
+        upload = SimpleUploadedFile(
+            "paper.pdf", b"%PDF-1.4\n%%EOF\n", content_type="application/pdf"
+        )
+        self.paper.pdf_file.save(upload.name, upload, save=True)
+        self.addCleanup(self.paper.pdf_file.delete, save=False)
+        self.client.raise_request_exception = False
+
+        response = self.client.get(reverse("paper-detail", args=[self.paper.pk]))
+
+        self.assertEqual(response.status_code, 200)
+
     def test_markdown_escapes_raw_html_and_keeps_latex(self):
         rendered = str(render_markdown(r"<script>alert(1)</script> \(x^2\)"))
 
         self.assertNotIn("<script>", rendered)
         self.assertIn("&lt;script&gt;", rendered)
+        self.assertIn(r"\(x^2\)", rendered)
+
+    def test_markdown_drops_dangerous_link_and_image_uris(self):
+        rendered = str(
+            render_markdown(
+                "[script](javascript:alert(1)) "
+                "![data](data:text/html;base64,PHNjcmlwdD4=) "
+                "[obfuscated](java&#x09;script:alert(1))"
+            )
+        )
+
+        self.assertNotIn("href=\"javascript:", rendered.lower())
+        self.assertNotIn("href=\"java&#x09;script:", rendered.lower())
+        self.assertNotIn("src=\"data:", rendered.lower())
+
+    def test_markdown_preserves_private_use_characters_and_latex(self):
+        source = "\ue000 \ue001 \ue002 \ue003 \\(x^2\\)"
+
+        rendered = str(render_markdown(source))
+
+        self.assertIn("\ue000 \ue001 \ue002 \ue003", rendered)
         self.assertIn(r"\(x^2\)", rendered)
