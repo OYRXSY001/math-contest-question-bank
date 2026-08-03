@@ -1,0 +1,66 @@
+TAXONOMY = (
+    ("calculus", "函数、极限与连续", "limits-continuity", (
+        ("函数性质", "function-properties"),
+        ("数列极限", "sequence-limit"),
+        ("函数极限", "function-limit"),
+        ("无穷小与无穷大", "infinitesimal-infinite"),
+        ("连续与间断点", "continuity-discontinuity"),
+    )),
+    ("calculus", "一元函数微分学", "single-variable-differential", (
+        ("导数与微分", "derivative-differential"),
+        ("中值定理", "mean-value-theorem"),
+        ("Taylor公式", "taylor-formula"),
+        ("单调性与极值", "monotonicity-extrema"),
+        ("凹凸性与拐点", "concavity-inflection"),
+        ("渐近线", "asymptote"),
+    )),
+    ("calculus", "一元函数积分学", "single-variable-integral", (
+        ("不定积分", "indefinite-integral"),
+        ("定积分", "definite-integral"),
+        ("定积分应用", "definite-integral-application"),
+        ("反常积分", "improper-integral"),
+        ("含参积分", "parameter-integral"),
+    )),
+    ("calculus", "多元函数微分学", "multivariable-differential", (
+        ("多元函数极限与连续", "multivariable-limit-continuity"),
+        ("偏导数与全微分", "partial-total-differential"),
+        ("复合函数与隐函数", "composite-implicit-function"),
+        ("方向导数与梯度", "directional-derivative-gradient"),
+        ("多元函数极值", "multivariable-extrema"),
+        ("Lagrange乘数法", "lagrange-multiplier"),
+    )),
+    ("calculus", "重积分", "multiple-integral", (
+        ("二重积分", "double-integral"),
+        ("三重积分", "triple-integral"),
+        ("坐标变换", "coordinate-transform"),
+    )),
+    ("calculus", "曲线积分与曲面积分", "line-surface-integral", (
+        ("第一、第二类曲线积分", "line-integral"),
+        ("第一、第二类曲面积分", "surface-integral"),
+        ("Green公式", "green-formula"),
+        ("Gauss公式", "gauss-formula"),
+        ("Stokes公式", "stokes-formula"),
+    )),
+    ("calculus", "无穷级数", "infinite-series", (
+        ("数项级数", "number-series"),
+        ("幂级数", "power-series"),
+        ("Fourier级数", "fourier-series"),
+    )),
+    ("calculus", "常微分方程", "ordinary-differential-equation", (
+        ("一阶微分方程", "first-order-ode"),
+        ("高阶微分方程", "higher-order-ode"),
+        ("微分方程综合应用", "ode-application"),
+    )),
+    ("calculus", "空间解析几何", "spatial-analytic-geometry", (
+        ("向量与坐标", "vector-coordinate"),
+        ("空间平面与直线", "plane-line"),
+        ("曲面与曲线", "surface-curve"),
+    )),
+    ("final_linear_algebra", "决赛·线性代数", "final-linear-algebra", (
+        ("行列式与矩阵", "determinant-matrix"),
+        ("线性方程组", "linear-equation-system"),
+        ("向量组", "vector-group"),
+        ("特征值与特征向量", "eigenvalue"),
+        ("二次型", "quadratic-form"),
+    )),
+)
