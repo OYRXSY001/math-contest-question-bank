@@ -1,2 +1,16 @@
 .worktrees/
+.venv/
+__pycache__/
+*.py[cod]
+.env
+db.sqlite3
+node_modules/
+staticfiles/
+media/*
+!media/.gitkeep
+data/import/*
+!data/import/.gitkeep
+data/review/*
+!data/review/.gitkeep
+*.log
 

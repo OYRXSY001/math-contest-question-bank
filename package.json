@@ -1,0 +1,8 @@
+{
+  "name": "cmc-non-math-a-question-bank",
+  "private": true,
+  "dependencies": {
+    "bootstrap": "5.3.8",
+    "katex": "0.18.1"
+  }
+}
