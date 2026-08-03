@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ question.paper.title }} 第{{ question.question_no }}题{% endblock %}
+{% block content %}
+<p><a href="{% url 'paper-detail' question.paper.pk %}">← {{ question.paper.title }}</a></p>
+{% include "question_bank/_question_card.html" %}
+<nav class="d-flex justify-content-between mt-4" aria-label="上下题">
+  {% if previous_question %}<a href="{% url 'question-detail' previous_question.pk %}">上一题</a>{% else %}<span></span>{% endif %}
+  {% if next_question %}<a href="{% url 'question-detail' next_question.pk %}">下一题</a>{% endif %}
+</nav>
+{% endblock %}

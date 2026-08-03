@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}{% if search_page %}搜题{% else %}真题库{% endif %}{% endblock %}
+{% block content %}
+<div class="row g-4">
+  <aside class="col-12 col-lg-3"><div class="question-card p-3">{% include "question_bank/_filters.html" %}</div></aside>
+  <section class="col-12 col-lg-9">
+    <h1 class="h3 mb-3">{% if search_page %}搜题结果{% elif question_mode %}题目结果{% else %}真题库{% endif %}</h1>
+    {% if question_mode %}
+      {% for question in page_obj %}{% include "question_bank/_question_card.html" %}{% empty %}<p>没有符合条件的题目。</p>{% endfor %}
+    {% else %}
+      <div class="row g-3">
+        {% for paper in page_obj %}
+          <div class="col-12 col-md-6"><article class="question-card p-4 h-100"><p class="text-secondary">第{{ paper.edition }}届 · {{ paper.get_stage_display }}</p><h2 class="h5"><a href="{% url 'paper-detail' paper.pk %}">{{ paper.title }}</a></h2><p class="mb-0">原卷类别：{{ paper.original_category_label }}</p></article></div>
+        {% empty %}<p>没有符合条件的试卷。</p>{% endfor %}
+      </div>
+    {% endif %}
+    {% if page_obj.paginator.num_pages > 1 %}
+      <nav class="d-flex justify-content-between mt-4" aria-label="分页">
+        {% if page_obj.has_previous %}<a href="{% querystring page=page_obj.previous_page_number %}">上一页</a>{% else %}<span></span>{% endif %}
+        <span>第{{ page_obj.number }}页，共{{ page_obj.paginator.num_pages }}页</span>
+        {% if page_obj.has_next %}<a href="{% querystring page=page_obj.next_page_number %}">下一页</a>{% else %}<span></span>{% endif %}
+      </nav>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

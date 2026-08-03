@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ paper.title }}{% endblock %}
+{% block content %}
+<header class="mb-4">
+  <p class="text-secondary mb-2">第{{ paper.edition }}届 · {{ paper.get_stage_display }} · {{ paper.original_category_label }}</p>
+  <div class="d-flex flex-wrap justify-content-between gap-3">
+    <h1 class="h2">{{ paper.title }}</h1>
+    {% if paper.pdf_file %}<a class="btn btn-outline-primary" href="{% url 'paper-download' paper.pk %}">下载 PDF</a>{% endif %}
+  </div>
+</header>
+<nav class="d-flex gap-2 overflow-x-auto mb-3" aria-label="题号导航">
+  {% for question in questions %}<a class="btn btn-sm btn-outline-secondary" href="#question-{{ question.pk }}">{{ question.question_no }}</a>{% endfor %}
+</nav>
+{% for question in questions %}{% include "question_bank/_question_card.html" %}{% empty %}<p>这份试卷还没有已发布题目。</p>{% endfor %}
+{% endblock %}

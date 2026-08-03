@@ -1,0 +1,28 @@
+{% load static %}
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="第1至17届全国大学生数学竞赛非数学A类真题与详细解析">
+  <title>{% block title %}非数学A类真题库{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/katex/katex.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/site.css' %}">
+</head>
+<body>
+  <nav class="navbar border-bottom bg-white sticky-top" aria-label="主导航">
+    <div class="container site-container">
+      <a class="navbar-brand fw-semibold" href="{% url 'home' %}">非数学A类真题库</a>
+      <a href="{% url 'paper-list' %}">真题库</a>
+    </div>
+  </nav>
+  <main class="container site-container py-4">
+    {% for message in messages %}<div class="alert alert-info">{{ message }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+  <script defer src="{% static 'vendor/katex/katex.min.js' %}"></script>
+  <script defer src="{% static 'vendor/katex/contrib/auto-render.min.js' %}"></script>
+  <script defer src="{% static 'js/math.js' %}"></script>
+</body>
+</html>

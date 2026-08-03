@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="py-5 text-center">
+  <p class="text-secondary mb-2">仅收录第1至17届非数学A类范围</p>
+  <h1 class="display-6 fw-bold mb-4">初赛、决赛真题与详细解析</h1>
+  <form action="{% url 'search' %}" method="get" class="row g-2 justify-content-center">
+    <div class="col-12 col-md-7">{{ filter_form.q }}</div>
+    <div class="col-auto"><button class="btn btn-primary" type="submit">搜题</button></div>
+  </form>
+  <div class="d-flex justify-content-center gap-2 mt-3">
+    <a class="btn btn-outline-primary" href="{% url 'paper-list' %}?stage=preliminary">初赛真题</a>
+    <a class="btn btn-outline-primary" href="{% url 'paper-list' %}?stage=final">决赛真题</a>
+  </div>
+</section>
+<section aria-labelledby="edition-title">
+  <h2 id="edition-title" class="h5 mb-3">按届数查看</h2>
+  <div class="d-flex flex-wrap gap-2">
+    {% for number in editions %}<a class="btn btn-outline-secondary" href="{% url 'paper-list' %}?edition={{ number }}">第{{ number }}届</a>{% endfor %}
+  </div>
+</section>
+{% endblock %}

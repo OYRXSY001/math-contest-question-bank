@@ -70,7 +70,11 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [BASE_DIR / "static"]
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+    ("vendor/bootstrap", BASE_DIR / "node_modules" / "bootstrap" / "dist"),
+    ("vendor/katex", BASE_DIR / "node_modules" / "katex" / "dist"),
+]
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"

@@ -1,0 +1,9 @@
+:root { --site-max: 1200px; }
+body { background: #f7f7f5; color: #202124; }
+.site-container { max-width: var(--site-max); }
+.question-card { background: #fff; border: 1px solid #deded8; border-radius: .75rem; }
+.question-content { line-height: 1.85; overflow-wrap: anywhere; }
+.question-content img { max-width: 100%; height: auto; }
+.question-content .katex-display { overflow-x: auto; overflow-y: hidden; padding-block: .4rem; }
+.question-content table { display: block; max-width: 100%; overflow-x: auto; }
+a { color: #1458a6; }

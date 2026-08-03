@@ -1,0 +1,13 @@
+<form method="get" class="filter-panel">
+  <div class="mb-3"><label class="form-label" for="{{ filter_form.q.id_for_label }}">关键词</label>{{ filter_form.q }}</div>
+  <div class="mb-3"><label class="form-label" for="{{ filter_form.edition.id_for_label }}">届数</label>{{ filter_form.edition }}</div>
+  <div class="mb-3"><label class="form-label" for="{{ filter_form.stage.id_for_label }}">阶段</label>{{ filter_form.stage }}</div>
+  <div class="mb-3"><label class="form-label" for="{{ filter_form.question_type.id_for_label }}">题型</label>{{ filter_form.question_type }}</div>
+  <details class="mb-3" {% if filter_form.knowledge.value %}open{% endif %}>
+    <summary class="mb-2">知识点</summary>{{ filter_form.knowledge }}
+  </details>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary" type="submit">筛选</button>
+    <a class="btn btn-outline-secondary" href="{% if search_page %}{% url 'search' %}{% else %}{% url 'paper-list' %}{% endif %}">清空</a>
+  </div>
+</form>

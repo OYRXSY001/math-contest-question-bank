@@ -1,0 +1,19 @@
+{% load content %}
+<article class="question-card p-3 p-md-4 mb-3" id="question-{{ question.pk }}">
+  <header class="d-flex flex-wrap justify-content-between gap-2 mb-3">
+    <div>
+      <a class="fw-semibold" href="{% url 'question-detail' question.pk %}">第{{ question.question_no }}题</a>
+      <span class="badge text-bg-light">{{ question.get_question_type_display }}</span>
+    </div>
+    <a class="small" href="{% url 'paper-detail' question.paper.pk %}">{{ question.paper.title }}</a>
+  </header>
+  <div class="question-content">{{ question.stem_md|render_markdown }}</div>
+  <div class="d-flex flex-wrap gap-2 my-3">
+    {% for point in question.knowledge_points.all %}<span class="badge rounded-pill text-bg-secondary">{{ point.name }}</span>{% endfor %}
+  </div>
+  <details>
+    <summary class="btn btn-outline-primary">查看答案与解析</summary>
+    {% if question.answer_md %}<div class="question-content mt-3"><strong>答案：</strong>{{ question.answer_md|render_markdown }}</div>{% endif %}
+    <div class="question-content mt-3">{{ question.solution_md|render_markdown }}</div>
+  </details>
+</article>
