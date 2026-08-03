@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.contrib.staticfiles import finders
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
@@ -52,6 +53,16 @@ class PublicPageTests(TestCase):
         self.assertContains(response, 'name="viewport"')
         self.assertContains(response, 'class="mobile-filter')
         self.assertContains(response, 'class="desktop-filter')
+
+    def test_base_assets_are_discoverable(self):
+        for asset in (
+            "css/bootstrap.min.css",
+            "katex.min.css",
+            "katex.min.js",
+            "contrib/auto-render.min.js",
+        ):
+            with self.subTest(asset=asset):
+                self.assertIsNotNone(finders.find(asset))
 
     def test_search_returns_matching_question(self):
         response = self.client.get(reverse("search"), {"q": "极限等于零"})

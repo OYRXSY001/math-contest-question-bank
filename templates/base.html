@@ -6,8 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="第1至17届全国大学生数学竞赛非数学A类真题与详细解析">
   <title>{% block title %}非数学A类真题库{% endblock %}</title>
-  <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}">
-  <link rel="stylesheet" href="{% static 'vendor/katex/katex.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'katex.min.css' %}">
   <link rel="stylesheet" href="{% static 'css/site.css' %}">
 </head>
 <body>
@@ -30,8 +30,8 @@
     {% for message in messages %}<div class="alert alert-info">{{ message }}</div>{% endfor %}
     {% block content %}{% endblock %}
   </main>
-  <script defer src="{% static 'vendor/katex/katex.min.js' %}"></script>
-  <script defer src="{% static 'vendor/katex/contrib/auto-render.min.js' %}"></script>
+  <script defer src="{% static 'katex.min.js' %}"></script>
+  <script defer src="{% static 'contrib/auto-render.min.js' %}"></script>
   <script defer src="{% static 'js/math.js' %}"></script>
 </body>
 </html>
