@@ -1,0 +1,132 @@
+import tempfile
+from pathlib import Path
+
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.core.management.base import CommandError
+from django.test import TestCase, override_settings
+from openpyxl import Workbook
+
+from question_bank.management.commands.import_question_bank import (
+    INVENTORY_HEADERS,
+    QUESTION_HEADERS,
+)
+from question_bank.models import KnowledgePoint, Paper, Question
+
+
+class QuestionBankImportTests(TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.media = self.root / "media"
+        self.review = self.root / "review"
+        self.media.mkdir()
+        self.review.mkdir()
+        self.override = override_settings(MEDIA_ROOT=self.media, REVIEW_ROOT=self.review)
+        self.override.enable()
+        self.reviewer = get_user_model().objects.create_user("import-reviewer")
+        self.knowledge = KnowledgePoint.objects.create(
+            name="函数极限", slug="function-limit", subject="calculus"
+        )
+
+    def tearDown(self):
+        self.override.disable()
+        self.temp.cleanup()
+
+    def write_workbook(self, path, headers, rows):
+        workbook = Workbook()
+        sheet = workbook.active
+        sheet.append(headers)
+        for row in rows:
+            sheet.append(row)
+        workbook.save(path)
+
+    def valid_files(self):
+        pdf = self.media / "edition-17-preliminary.pdf"
+        crop = self.review / "q1.png"
+        pdf.write_bytes(b"%PDF-1.4\n%%EOF")
+        crop.write_bytes(b"fake-png-review-copy")
+        return pdf.name, crop.name
+
+    def valid_rows(self):
+        pdf_name, crop_name = self.valid_files()
+        inventory = [[
+            17, "preliminary", "非数学A类", "第17届非数学A类初赛",
+            2025, "https://example.test/source", pdf_name, 1,
+        ]]
+        questions = [[
+            17, "preliminary", "1", 1, "calculation", 10,
+            "function-limit", "", r"计算 \(\lim_{x\to0}x\)。", "0",
+            "由极限定义，结果为 0。", "", 1, crop_name, 0.99,
+            True, True, True, 0, 0, self.reviewer.username,
+        ]]
+        return inventory, questions
+
+    def test_create_templates_writes_both_workbooks(self):
+        output = self.root / "templates"
+
+        call_command("import_question_bank", create_templates=str(output))
+
+        self.assertTrue((output / "source_inventory.xlsx").exists())
+        self.assertTrue((output / "questions.xlsx").exists())
+
+    def test_valid_import_is_idempotent(self):
+        inventory_rows, question_rows = self.valid_rows()
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+        call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+
+        self.assertEqual(Paper.objects.count(), 1)
+        self.assertEqual(Question.objects.count(), 1)
+        question = Question.objects.get()
+        self.assertEqual(question.paper.edition, 17)
+        self.assertEqual(question.knowledge_points.get(), self.knowledge)
+        self.assertEqual(question.status, "reviewed")
+
+    def test_dry_run_does_not_write(self):
+        inventory_rows, question_rows = self.valid_rows()
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        call_command(
+            "import_question_bank",
+            inventory=str(inventory),
+            questions=str(questions),
+            dry_run=True,
+        )
+
+        self.assertFalse(Paper.objects.exists())
+
+    def test_duplicate_question_rolls_back_whole_import(self):
+        inventory_rows, question_rows = self.valid_rows()
+        question_rows.append(question_rows[0].copy())
+        inventory_rows[0][-1] = 2
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        with self.assertRaises(CommandError):
+            call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+
+        self.assertFalse(Paper.objects.exists())
+        self.assertFalse(Question.objects.exists())
+
+    def test_invalid_latex_rolls_back_whole_import(self):
+        inventory_rows, question_rows = self.valid_rows()
+        question_rows[0][8] = r"错误公式 \(\frac{1}{\)"
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        with self.assertRaises(CommandError):
+            call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+
+        self.assertFalse(Paper.objects.exists())
