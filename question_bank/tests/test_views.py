@@ -220,3 +220,46 @@ class UserQuestionListTests(PublicPageTests):
         response = self.client.post(reverse("favorite-add", args=[draft.pk]))
 
         self.assertEqual(response.status_code, 404)
+
+    def test_personal_lists_keep_filters_when_paginating(self):
+        reviewer = get_user_model().objects.get(username="view-reviewer")
+        questions = []
+        for number in range(2, 23):
+            questions.append(
+                Question.objects.create(
+                    paper=self.paper,
+                    question_no=str(number),
+                    sort_order=number,
+                    question_type="calculation",
+                    stem_md=f"pagination page-marker-{number}",
+                    solution_md="solution",
+                    source_page=number,
+                    text_checked=True,
+                    formula_checked=True,
+                    solution_checked=True,
+                    reviewed_by=reviewer,
+                    status="published",
+                )
+            )
+        Favorite.objects.bulk_create(Favorite(user=self.user, question=question) for question in questions)
+        WrongQuestion.objects.bulk_create(WrongQuestion(user=self.user, question=question) for question in questions)
+        self.client.force_login(self.user)
+
+        favorites = self.client.get(reverse("favorites"), {"q": "pagination"})
+        wrong_questions = self.client.get(reverse("wrong-questions"), {"q": "pagination"})
+        favorite_page_two = self.client.get(reverse("favorites"), {"q": "pagination", "page": 2})
+
+        expected_link = "?q=pagination&amp;page=2"
+        self.assertContains(favorites, expected_link)
+        self.assertContains(wrong_questions, expected_link)
+        self.assertEqual(favorite_page_two.context["page_obj"].number, 2)
+        self.assertContains(favorite_page_two, "page-marker-22")
+
+    def test_personal_filter_clear_links_stay_on_current_list(self):
+        self.client.force_login(self.user)
+
+        favorites = self.client.get(reverse("favorites"), {"q": "anything"})
+        wrong_questions = self.client.get(reverse("wrong-questions"), {"q": "anything"})
+
+        self.assertContains(favorites, f'href="{reverse("favorites")}"')
+        self.assertContains(wrong_questions, f'href="{reverse("wrong-questions")}"')

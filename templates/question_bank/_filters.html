@@ -8,6 +8,6 @@
   </details>
   <div class="d-flex gap-2">
     <button class="btn btn-primary" type="submit">筛选</button>
-    <a class="btn btn-outline-secondary" href="{% if search_page %}{% url 'search' %}{% else %}{% url 'paper-list' %}{% endif %}">清空</a>
+    <a class="btn btn-outline-secondary" href="{% if clear_url %}{{ clear_url }}{% elif search_page %}{% url 'search' %}{% else %}{% url 'paper-list' %}{% endif %}">清空</a>
   </div>
 </form>

@@ -166,7 +166,11 @@ def _personal_list(request, relation, template_name):
     questions, form = filtered_questions(request.GET, base_queryset=base)
     questions = with_user_flags(questions, request.user)
     page_obj = Paginator(questions, 20).get_page(request.GET.get("page"))
-    return render(request, template_name, {"filter_form": form, "page_obj": page_obj})
+    return render(
+        request,
+        template_name,
+        {"filter_form": form, "page_obj": page_obj, "clear_url": request.path},
+    )
 
 
 @login_required

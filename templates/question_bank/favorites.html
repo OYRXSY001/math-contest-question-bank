@@ -6,6 +6,7 @@
   <section class="col-12 col-lg-9">
     <h1 class="h3 mb-3">我的收藏</h1>
     {% for question in page_obj %}{% include "question_bank/_question_card.html" %}{% empty %}<p>还没有收藏题目。</p>{% endfor %}
+    {% include "question_bank/_pagination.html" %}
   </section>
 </div>
 {% endblock %}
