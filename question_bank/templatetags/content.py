@@ -8,7 +8,7 @@ from django.utils.safestring import mark_safe
 register = template.Library()
 URL_ATTRIBUTE_RE = re.compile(
     r"""(?P<attribute>\b(?:href|src))\s*=\s*(?P<quote>["'])(?P<url>.*?)(?P=quote)""",
-    re.IGNORECASE,
+    re.IGNORECASE | re.DOTALL,
 )
 
 

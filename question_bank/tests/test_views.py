@@ -103,6 +103,31 @@ class PublicPageTests(TestCase):
         self.assertNotIn("href=\"java&#x09;script:", rendered.lower())
         self.assertNotIn("src=\"data:", rendered.lower())
 
+    def test_markdown_drops_newline_obfuscated_link_and_image_uris(self):
+        rendered = str(
+            render_markdown(
+                "[line-feed](java\nscript:alert(1)) "
+                "![line-feed](java\nscript:alert(1)) "
+                "[carriage-return](java\rscript:alert(1)) "
+                "![carriage-return](java\rscript:alert(1))"
+            )
+        )
+
+        self.assertNotRegex(rendered.lower(), r"""(?:href|src)="[^"]*java[\r\n]script:""")
+
+    def test_markdown_keeps_safe_link_uris(self):
+        rendered = str(
+            render_markdown(
+                "[relative](/papers/) [https](https://example.com/) "
+                "[email](mailto:study@example.com) ![image](/image.png)"
+            )
+        )
+
+        self.assertIn('href="/papers/"', rendered)
+        self.assertIn('href="https://example.com/"', rendered)
+        self.assertIn('href="mailto:study@example.com"', rendered)
+        self.assertIn('src="/image.png"', rendered)
+
     def test_markdown_preserves_private_use_characters_and_latex(self):
         source = "\ue000 \ue001 \ue002 \ue003 \\(x^2\\)"
 
