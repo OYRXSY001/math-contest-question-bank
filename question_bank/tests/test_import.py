@@ -7,6 +7,7 @@ from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 from openpyxl import Workbook
 
+from question_bank.katex import extract_formulas, validate_markdown_formulas
 from question_bank.management.commands.import_question_bank import (
     INVENTORY_HEADERS,
     QUESTION_HEADERS,
@@ -128,5 +129,124 @@ class QuestionBankImportTests(TestCase):
 
         with self.assertRaises(CommandError):
             call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+
+        self.assertFalse(Paper.objects.exists())
+
+    def test_fractional_integer_is_rejected(self):
+        inventory_rows, question_rows = self.valid_rows()
+        inventory_rows[0][0] = 17.5
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        with self.assertRaises(CommandError):
+            call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+
+        self.assertFalse(Paper.objects.exists())
+
+    def test_boolean_integer_is_rejected(self):
+        inventory_rows, question_rows = self.valid_rows()
+        question_rows[0][3] = True
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        with self.assertRaises(CommandError):
+            call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+
+        self.assertFalse(Paper.objects.exists())
+
+    def test_fractional_exam_year_is_rejected(self):
+        inventory_rows, question_rows = self.valid_rows()
+        inventory_rows[0][4] = 2025.5
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        with self.assertRaises(CommandError):
+            call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+
+        self.assertFalse(Paper.objects.exists())
+
+    def test_unknown_boolean_is_rejected(self):
+        inventory_rows, question_rows = self.valid_rows()
+        question_rows[0][15] = "checked"
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        with self.assertRaises(CommandError):
+            call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+
+        self.assertFalse(Paper.objects.exists())
+
+    def test_explicit_boolean_vocabulary_is_accepted(self):
+        inventory_rows, question_rows = self.valid_rows()
+        question_rows[0][15:18] = ["yes", 0, "否"]
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        try:
+            call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+        except CommandError as error:
+            self.fail(f"explicit boolean vocabulary was rejected: {error}")
+
+        self.assertEqual(Question.objects.get().status, "draft")
+
+    def test_formula_delimiters_are_scanned_in_order(self):
+        invalid = [
+            r"\)broken\(",
+            r"\(broken",
+            r"broken\)",
+            r"\(crossed \[formula\)\]",
+        ]
+
+        for text in invalid:
+            with self.subTest(text=text):
+                self.assertTrue(validate_markdown_formulas([("stem", text)]))
+
+        self.assertEqual(
+            extract_formulas(r"\(x+1\) and \[y^2\]"),
+            ["x+1", "y^2"],
+        )
+
+    def test_reversed_formula_delimiters_roll_back_whole_import(self):
+        inventory_rows, question_rows = self.valid_rows()
+        question_rows[0][8] = r"错误定界符 \)broken\("
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        with self.assertRaises(CommandError):
+            call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+
+        self.assertFalse(Paper.objects.exists())
+
+    def test_duplicate_secondary_knowledge_is_rejected_before_writes(self):
+        KnowledgePoint.objects.create(
+            name="导数", slug="derivative", subject="calculus"
+        )
+        inventory_rows, question_rows = self.valid_rows()
+        question_rows[0][7] = "derivative,derivative"
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        try:
+            call_command("import_question_bank", inventory=str(inventory), questions=str(questions))
+        except CommandError:
+            pass
+        except Exception as error:
+            self.fail(f"expected CommandError, got {type(error).__name__}: {error}")
+        else:
+            self.fail("CommandError not raised")
 
         self.assertFalse(Paper.objects.exists())

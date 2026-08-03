@@ -31,17 +31,30 @@ QUESTION_HEADERS = [
 
 
 def as_int(value, label, issues):
+    if isinstance(value, bool):
+        issues.append(f"{label}: 必须是整数")
+        return 0
     try:
-        return int(value)
+        parsed = int(value)
     except (TypeError, ValueError):
         issues.append(f"{label}: 必须是整数")
         return 0
+    if not isinstance(value, (str, bytes)) and value != parsed:
+        issues.append(f"{label}: 必须是整数")
+        return 0
+    return parsed
 
 
-def as_bool(value):
+def as_bool(value, label, issues):
     if isinstance(value, bool):
         return value
-    return str(value or "").strip().lower() in {"1", "true", "yes", "是"}
+    normalized = str(value).strip().lower()
+    if normalized in {"1", "true", "yes", "是"}:
+        return True
+    if normalized in {"0", "false", "no", "否"}:
+        return False
+    issues.append(f"{label}: 必须是布尔值")
+    return False
 
 
 def split_values(value):
@@ -171,6 +184,12 @@ class Command(BaseCommand):
                 issues.append(f"{label}: title 不能为空")
             row["_edition"] = edition
             row["_stage"] = stage
+            exam_year = row.get("exam_year")
+            row["_exam_year"] = (
+                None
+                if exam_year in (None, "")
+                else as_int(exam_year, f"{label} exam_year", issues)
+            )
             question_count = as_int(
                 row.get("question_count"), f"{label} question_count", issues
             )
@@ -210,6 +229,9 @@ class Command(BaseCommand):
 
             primary = str(row.get("primary_knowledge") or "").strip()
             secondary = split_values(row.get("secondary_knowledge"))
+            for slug, count in Counter(secondary).items():
+                if count > 1:
+                    issues.append(f"{label}: 次知识点重复 {slug}")
             for slug in [primary, *secondary]:
                 if slug not in knowledge:
                     issues.append(f"{label}: 未知知识点 {slug}")
@@ -247,9 +269,15 @@ class Command(BaseCommand):
                 "_primary": primary,
                 "_secondary": secondary,
                 "_reviewer": users.get(reviewer_name),
-                "_text_checked": as_bool(row.get("text_checked")),
-                "_formula_checked": as_bool(row.get("formula_checked")),
-                "_solution_checked": as_bool(row.get("solution_checked")),
+                "_text_checked": as_bool(
+                    row.get("text_checked"), f"{label} text_checked", issues
+                ),
+                "_formula_checked": as_bool(
+                    row.get("formula_checked"), f"{label} formula_checked", issues
+                ),
+                "_solution_checked": as_bool(
+                    row.get("solution_checked"), f"{label} solution_checked", issues
+                ),
             })
         return rows
 
@@ -270,7 +298,7 @@ class Command(BaseCommand):
                 defaults={
                     "original_category_label": str(row["original_category_label"]).strip(),
                     "title": str(row["title"]).strip(),
-                    "exam_year": row.get("exam_year") or None,
+                    "exam_year": row["_exam_year"],
                     "source_url": str(row.get("source_url") or "").strip(),
                     "pdf_file": str(row.get("pdf_file") or "").strip(),
                     "status": Paper.Status.REVIEWED,
