@@ -1,7 +1,13 @@
-from django.core.management import call_command
-from django.test import TestCase
+import tempfile
+from pathlib import Path
 
-from question_bank.models import KnowledgePoint
+from django.contrib import admin
+from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.test import RequestFactory, TestCase, override_settings
+
+from question_bank.admin import QuestionAdmin
+from question_bank.models import KnowledgePoint, Paper, Question
 
 
 class KnowledgeSeedTests(TestCase):
@@ -18,3 +24,65 @@ class KnowledgeSeedTests(TestCase):
         )
         self.assertTrue(KnowledgePoint.objects.filter(slug="function-limit").exists())
         self.assertTrue(KnowledgePoint.objects.filter(slug="eigenvalue").exists())
+
+
+class QuestionAdminReviewTests(TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.review_root = Path(self.temp.name)
+        self.override = override_settings(REVIEW_ROOT=self.review_root)
+        self.override.enable()
+        self.staff = get_user_model().objects.create_superuser(
+            "admin-reviewer", "admin@example.test", "pass-12345"
+        )
+        self.paper = Paper.objects.create(
+            edition=17,
+            stage="preliminary",
+            original_category_label="非数学A类",
+            title="第17届非数学A类初赛",
+            status="published",
+        )
+        self.question = Question.objects.create(
+            paper=self.paper,
+            question_no="1",
+            sort_order=1,
+            question_type="calculation",
+            stem_md=r"计算 \(x^2\)。",
+            solution_md="解析",
+            source_page=1,
+            source_crop="q1.png",
+        )
+        (self.review_root / "q1.png").write_bytes(b"small-review-image")
+        self.model_admin = QuestionAdmin(Question, admin.site)
+
+    def tearDown(self):
+        self.override.disable()
+        self.temp.cleanup()
+
+    def test_source_preview_is_embedded_without_public_file_url(self):
+        preview = str(self.model_admin.source_preview(self.question))
+
+        self.assertIn("data:image/png;base64,", preview)
+        self.assertNotIn(str(self.review_root), preview)
+
+    def test_rendered_preview_escapes_html_and_keeps_formula(self):
+        self.question.stem_md = r"<script>alert(1)</script> \(x^2\)"
+
+        preview = str(self.model_admin.rendered_preview(self.question))
+
+        self.assertNotIn("<script>", preview)
+        self.assertIn(r"\(x^2\)", preview)
+
+    def test_publish_action_skips_unreviewed_question(self):
+        request = RequestFactory().post("/admin/")
+        request.user = self.staff
+        request._messages = type(
+            "Messages", (), {"add": lambda *args, **kwargs: None}
+        )()
+
+        self.model_admin.publish_reviewed(
+            request, Question.objects.filter(pk=self.question.pk)
+        )
+
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, Question.Status.DRAFT)

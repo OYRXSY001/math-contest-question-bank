@@ -1,5 +1,12 @@
-from django.contrib import admin
+import base64
+import mimetypes
+from pathlib import Path
 
+from django.contrib import admin
+from django.conf import settings
+from django.utils.html import format_html
+
+from .templatetags.content import render_markdown
 from .models import (
     Favorite,
     KnowledgePoint,
@@ -24,10 +31,90 @@ class PaperAdmin(admin.ModelAdmin):
 
 @admin.register(Question)
 class QuestionAdmin(admin.ModelAdmin):
-    list_display = ("paper", "question_no", "question_type", "status")
-    list_filter = ("paper__edition", "paper__stage", "question_type", "status")
+    list_display = (
+        "paper", "question_no", "question_type", "review_state", "status"
+    )
+    list_filter = (
+        "paper__edition",
+        "paper__stage",
+        "question_type",
+        "status",
+        "text_checked",
+        "formula_checked",
+        "solution_checked",
+    )
     search_fields = ("stem_md", "answer_md", "solution_md")
+    readonly_fields = ("source_preview", "rendered_preview", "search_text")
     inlines = (QuestionKnowledgeInline,)
+    actions = ("publish_reviewed",)
+    fieldsets = (
+        ("归属", {"fields": ("paper", "question_no", "sort_order", "question_type", "score")} ),
+        ("内容", {"fields": ("stem_md", "answer_md", "solution_md", "rendered_preview")} ),
+        ("原卷", {"fields": ("source_page", "source_crop", "source_preview")} ),
+        (
+            "复核",
+            {
+                "fields": (
+                    "text_checked",
+                    "formula_checked",
+                    "solution_checked",
+                    "unresolved_ocr_items",
+                    "katex_errors",
+                    "reviewed_by",
+                    "reviewed_at",
+                    "status",
+                )
+            },
+        ),
+        ("搜索", {"fields": ("search_text",), "classes": ("collapse",)}),
+    )
+
+    @admin.display(description="复核状态")
+    def review_state(self, obj):
+        return "通过" if obj.can_publish() else "未通过"
+
+    @admin.display(description="原卷截图")
+    def source_preview(self, obj):
+        if not obj.source_crop:
+            return "未上传校对截图"
+        root = Path(settings.REVIEW_ROOT).resolve()
+        path = (root / obj.source_crop).resolve()
+        if not path.is_relative_to(root) or not path.is_file():
+            return "校对截图不存在"
+        if path.stat().st_size > 5 * 1024 * 1024:
+            return "校对截图超过 5 MB"
+        mime = mimetypes.guess_type(path.name)[0]
+        if mime not in {"image/png", "image/jpeg", "image/webp"}:
+            return "校对截图格式必须是 PNG、JPEG 或 WebP"
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+        return format_html(
+            '<img src="data:{};base64,{}" alt="原卷第{}页截图" style="max-width:100%;height:auto">',
+            mime,
+            encoded,
+            obj.source_page,
+        )
+
+    @admin.display(description="网页渲染预览")
+    def rendered_preview(self, obj):
+        return format_html(
+            '<section class="question-preview"><h3>题干</h3>{}<h3>答案</h3>{}<h3>解析</h3>{}</section>',
+            render_markdown(obj.stem_md),
+            render_markdown(obj.answer_md),
+            render_markdown(obj.solution_md),
+        )
+
+    @admin.action(description="发布已通过全部复核的题目")
+    def publish_reviewed(self, request, queryset):
+        published = 0
+        skipped = 0
+        for question in queryset.select_related("paper", "reviewed_by"):
+            if question.can_publish():
+                question.status = Question.Status.PUBLISHED
+                question.save(update_fields=["status", "search_text", "updated_at"])
+                published += 1
+            else:
+                skipped += 1
+        self.message_user(request, f"已发布 {published} 题，跳过 {skipped} 题。")
 
 
 @admin.register(KnowledgePoint)
