@@ -1,8 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{% if search_page %}搜题{% else %}真题库{% endif %}{% endblock %}
 {% block content %}
+<details class="mobile-filter question-card p-3 mb-3 d-lg-none">
+  <summary class="fw-semibold">筛选题目</summary>
+  <div class="pt-3">{% include "question_bank/_filters.html" %}</div>
+</details>
 <div class="row g-4">
-  <aside class="col-12 col-lg-3"><div class="question-card p-3">{% include "question_bank/_filters.html" %}</div></aside>
+  <aside class="desktop-filter col-lg-3 d-none d-lg-block"><div class="question-card p-3 sticky-filter">{% include "question_bank/_filters.html" %}</div></aside>
   <section class="col-12 col-lg-9">
     <h1 class="h3 mb-3">{% if search_page %}搜题结果{% elif question_mode %}题目结果{% else %}真题库{% endif %}</h1>
     {% if question_mode %}

@@ -46,6 +46,13 @@ class PublicPageTests(TestCase):
         self.assertContains(response, self.paper.title)
         self.assertNotContains(response, self.draft_paper.title)
 
+    def test_list_page_contains_mobile_filter_and_viewport_support(self):
+        response = self.client.get(reverse("paper-list"))
+
+        self.assertContains(response, 'name="viewport"')
+        self.assertContains(response, 'class="mobile-filter')
+        self.assertContains(response, 'class="desktop-filter')
+
     def test_search_returns_matching_question(self):
         response = self.client.get(reverse("search"), {"q": "极限等于零"})
 
