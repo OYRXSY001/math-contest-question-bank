@@ -1,0 +1,15 @@
+{$SITE_ADDRESS} {
+    encode zstd gzip
+
+    handle_path /static/* {
+        root * /srv/cmc-a/staticfiles
+        file_server
+    }
+
+    handle_path /media/* {
+        root * /srv/cmc-a/media
+        file_server
+    }
+
+    reverse_proxy 127.0.0.1:8000
+}

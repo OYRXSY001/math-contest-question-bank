@@ -1,0 +1,18 @@
+[Unit]
+Description=Non-mathematics A question bank
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/srv/cmc-a
+EnvironmentFile=/etc/cmc-a.env
+ExecStart=/srv/cmc-a/.venv/bin/gunicorn --workers 2 --bind 127.0.0.1:8000 config.wsgi:application
+Restart=on-failure
+RestartSec=5
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
