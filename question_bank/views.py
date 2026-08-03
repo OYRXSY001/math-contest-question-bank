@@ -1,8 +1,13 @@
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.http import require_POST
 
 from .forms import QuestionFilterForm
-from .models import Paper, Question
+from .models import Favorite, Paper, Question, WrongQuestion
 from .queries import filtered_questions, with_user_flags
 
 
@@ -98,6 +103,80 @@ def question_detail(request, pk):
             "next_question": siblings.filter(sort_order__gt=question.sort_order).first(),
         },
     )
+
+
+def _return_url(request, question):
+    candidate = request.POST.get("next", "")
+    if candidate and url_has_allowed_host_and_scheme(
+        candidate,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return candidate
+    return reverse("question-detail", args=[question.pk])
+
+
+def _published_question(pk):
+    return get_object_or_404(
+        Question,
+        pk=pk,
+        status=Question.Status.PUBLISHED,
+        paper__status=Paper.Status.PUBLISHED,
+    )
+
+
+@login_required
+@require_POST
+def favorite_add(request, pk):
+    question = _published_question(pk)
+    Favorite.objects.get_or_create(user=request.user, question=question)
+    messages.success(request, "已加入收藏。")
+    return redirect(_return_url(request, question))
+
+
+@login_required
+@require_POST
+def favorite_remove(request, pk):
+    question = _published_question(pk)
+    Favorite.objects.filter(user=request.user, question=question).delete()
+    messages.success(request, "已取消收藏。")
+    return redirect(_return_url(request, question))
+
+
+@login_required
+@require_POST
+def wrong_add(request, pk):
+    question = _published_question(pk)
+    WrongQuestion.objects.get_or_create(user=request.user, question=question)
+    messages.success(request, "已加入错题本。")
+    return redirect(_return_url(request, question))
+
+
+@login_required
+@require_POST
+def wrong_remove(request, pk):
+    question = _published_question(pk)
+    WrongQuestion.objects.filter(user=request.user, question=question).delete()
+    messages.success(request, "已移出错题本。")
+    return redirect(_return_url(request, question))
+
+
+def _personal_list(request, relation, template_name):
+    base = Question.objects.filter(**{f"{relation}__user": request.user})
+    questions, form = filtered_questions(request.GET, base_queryset=base)
+    questions = with_user_flags(questions, request.user)
+    page_obj = Paginator(questions, 20).get_page(request.GET.get("page"))
+    return render(request, template_name, {"filter_form": form, "page_obj": page_obj})
+
+
+@login_required
+def favorites(request):
+    return _personal_list(request, "favorited_by", "question_bank/favorites.html")
+
+
+@login_required
+def wrong_questions(request):
+    return _personal_list(request, "marked_wrong_by", "question_bank/wrong_questions.html")
 
 
 def not_found(request, exception):

@@ -15,6 +15,15 @@
     <div class="container site-container">
       <a class="navbar-brand fw-semibold" href="{% url 'home' %}">非数学A类真题库</a>
       <a href="{% url 'paper-list' %}">真题库</a>
+      {% if user.is_authenticated %}
+        <a href="{% url 'favorites' %}">收藏</a>
+        <a href="{% url 'wrong-questions' %}">错题</a>
+        <form method="post" action="{% url 'accounts:logout' %}" class="m-0">
+          {% csrf_token %}<button class="btn btn-link p-0" type="submit">退出</button>
+        </form>
+      {% else %}
+        <a href="{% url 'accounts:login' %}">登录</a>
+      {% endif %}
     </div>
   </nav>
   <main class="container site-container py-4">

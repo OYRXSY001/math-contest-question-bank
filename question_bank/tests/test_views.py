@@ -3,7 +3,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
-from question_bank.models import Paper, Question
+from question_bank.models import Favorite, Paper, Question, WrongQuestion
 from question_bank.templatetags.content import render_markdown
 
 
@@ -135,3 +135,88 @@ class PublicPageTests(TestCase):
 
         self.assertIn("\ue000 \ue001 \ue002 \ue003", rendered)
         self.assertIn(r"\(x^2\)", rendered)
+
+
+class UserQuestionListTests(PublicPageTests):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user("collector", password="pass-12345")
+
+    def test_anonymous_user_cannot_add_favorite(self):
+        response = self.client.post(reverse("favorite-add", args=[self.question.pk]))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse("accounts:login"), response.url)
+
+    def test_mutation_routes_are_post_only(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse("favorite-add", args=[self.question.pk]))
+
+        self.assertEqual(response.status_code, 405)
+
+    def test_add_and_remove_favorite_are_idempotent(self):
+        self.client.force_login(self.user)
+        add_url = reverse("favorite-add", args=[self.question.pk])
+        remove_url = reverse("favorite-remove", args=[self.question.pk])
+
+        self.client.post(add_url)
+        self.client.post(add_url)
+        self.assertEqual(Favorite.objects.filter(user=self.user, question=self.question).count(), 1)
+
+        self.client.post(remove_url)
+        self.client.post(remove_url)
+        self.assertFalse(Favorite.objects.filter(user=self.user, question=self.question).exists())
+
+    def test_user_only_sees_own_favorites_and_wrong_questions(self):
+        other = get_user_model().objects.create_user("other")
+        Favorite.objects.create(user=other, question=self.question)
+        WrongQuestion.objects.create(user=other, question=self.question)
+        own_favorite = Favorite.objects.create(user=self.user, question=self.question)
+        own_wrong_question = WrongQuestion.objects.create(user=self.user, question=self.question)
+        self.client.force_login(self.user)
+
+        favorites = self.client.get(reverse("favorites"))
+        wrong_questions = self.client.get(reverse("wrong-questions"))
+
+        favorite_questions = list(favorites.context["page_obj"].object_list)
+        wrong_question_questions = list(wrong_questions.context["page_obj"].object_list)
+        self.assertEqual(favorite_questions, [self.question])
+        self.assertEqual(wrong_question_questions, [self.question])
+        self.assertTrue(favorite_questions[0].is_favorite)
+        self.assertTrue(wrong_question_questions[0].is_wrong)
+        self.assertEqual(own_favorite.question, favorite_questions[0])
+        self.assertEqual(own_wrong_question.question, wrong_question_questions[0])
+
+    def test_wrong_question_add_and_remove(self):
+        self.client.force_login(self.user)
+
+        self.client.post(reverse("wrong-add", args=[self.question.pk]))
+        self.assertTrue(WrongQuestion.objects.filter(user=self.user, question=self.question).exists())
+        self.client.post(reverse("wrong-remove", args=[self.question.pk]))
+        self.assertFalse(WrongQuestion.objects.filter(user=self.user, question=self.question).exists())
+
+    def test_external_next_falls_back_to_question_detail(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse("favorite-add", args=[self.question.pk]),
+            {"next": "https://evil.example/steal"},
+        )
+
+        self.assertRedirects(response, reverse("question-detail", args=[self.question.pk]))
+
+    def test_mutations_reject_unpublished_question(self):
+        draft = Question.objects.create(
+            paper=self.draft_paper,
+            question_no="1",
+            sort_order=1,
+            question_type="calculation",
+            stem_md="draft",
+            solution_md="draft",
+            source_page=1,
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.post(reverse("favorite-add", args=[draft.pk]))
+
+        self.assertEqual(response.status_code, 404)

@@ -16,4 +16,16 @@
     {% if question.answer_md %}<div class="question-content mt-3"><strong>答案：</strong>{{ question.answer_md|render_markdown }}</div>{% endif %}
     <div class="question-content mt-3">{{ question.solution_md|render_markdown }}</div>
   </details>
+  <footer class="d-flex flex-wrap gap-2 mt-3">
+    {% if user.is_authenticated %}
+      <form method="post" action="{% if question.is_favorite %}{% url 'favorite-remove' question.pk %}{% else %}{% url 'favorite-add' question.pk %}{% endif %}">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-outline-primary" type="submit">{% if question.is_favorite %}取消收藏{% else %}收藏{% endif %}</button>
+      </form>
+      <form method="post" action="{% if question.is_wrong %}{% url 'wrong-remove' question.pk %}{% else %}{% url 'wrong-add' question.pk %}{% endif %}">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button class="btn btn-sm btn-outline-danger" type="submit">{% if question.is_wrong %}移出错题本{% else %}加入错题本{% endif %}</button>
+      </form>
+    {% else %}
+      <a class="btn btn-sm btn-outline-primary" href="{% url 'accounts:login' %}?next={{ request.path|urlencode }}">登录后收藏或加入错题本</a>
+    {% endif %}
+  </footer>
 </article>
