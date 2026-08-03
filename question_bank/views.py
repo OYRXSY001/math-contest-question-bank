@@ -1,6 +1,7 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils.http import url_has_allowed_host_and_scheme
@@ -82,6 +83,19 @@ def paper_detail(request, pk):
         request,
         "question_bank/paper_detail.html",
         {"paper": paper, "questions": with_user_flags(questions, request.user)},
+    )
+
+
+def paper_download(request, pk):
+    paper = get_object_or_404(Paper, pk=pk, status=Paper.Status.PUBLISHED)
+    if not paper.pdf_file:
+        raise Http404("PDF not found")
+    filename = f"第{paper.edition}届-非数学A类-{paper.get_stage_display()}.pdf"
+    return FileResponse(
+        paper.pdf_file.open("rb"),
+        as_attachment=True,
+        filename=filename,
+        content_type="application/pdf",
     )
 
 
