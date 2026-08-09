@@ -19,6 +19,7 @@
 - Public pages show only `published` papers and questions.
 - Do not add Python or Node dependencies and do not create a database migration.
 - Use built-in Django tests; do not add pytest.
+- Tests for new or repaired behavior must fail for the expected reason before production changes; regression tests that preserve existing safe behavior may already pass.
 - Work only on branch `non-math-a-question-bank`; do not merge to `main`.
 
 ## Final File Map

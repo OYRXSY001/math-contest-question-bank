@@ -119,7 +119,7 @@ status: approved
 
 ## 5. 完成标准
 
-- 所有新增测试先按预期失败，再由最小实现修复。
+- 针对新增或修复行为的测试先按预期失败，再由最小实现修复；用于保留现有安全行为的回归测试可以先通过。
 - 完整 Django 测试通过。
 - `manage.py check` 无错误。
 - `makemigrations --check --dry-run` 显示无模型变更。
