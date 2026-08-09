@@ -2,6 +2,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
+from django.utils import timezone
 
 from question_bank.models import (
     Favorite,
@@ -26,6 +27,25 @@ class QuestionBankModelTests(TestCase):
         cls.knowledge = KnowledgePoint.objects.create(
             name="函数极限", slug="function-limit", subject=KnowledgePoint.Subject.CALCULUS
         )
+
+    def create_reviewed_question(self, **overrides):
+        values = {
+            "paper": self.paper,
+            "question_no": "1",
+            "sort_order": 1,
+            "question_type": Question.Type.CALCULATION,
+            "stem_md": r"求 \(x\) 的值。",
+            "solution_md": "详细解析",
+            "source_page": 1,
+            "text_checked": True,
+            "formula_checked": True,
+            "solution_checked": True,
+            "reviewed_by": self.user,
+            "reviewed_at": timezone.now(),
+            "status": Question.Status.REVIEWED,
+        }
+        values.update(overrides)
+        return Question.objects.create(**values)
 
     def test_edition_must_be_between_1_and_17(self):
         paper = Paper(
@@ -66,25 +86,41 @@ class QuestionBankModelTests(TestCase):
             question.save()
 
     def test_reviewed_question_can_be_published_and_builds_search_text(self):
-        question = Question.objects.create(
-            paper=self.paper,
-            question_no="1",
-            sort_order=1,
-            question_type=Question.Type.CALCULATION,
+        question = self.create_reviewed_question(
             stem_md=r"计算函数极限 \(\lim_{x\to0}x\)。",
             answer_md="0",
             solution_md="利用极限定义可得 0。",
-            source_page=1,
-            text_checked=True,
-            formula_checked=True,
-            solution_checked=True,
-            reviewed_by=self.user,
-            status=Question.Status.PUBLISHED,
         )
+        QuestionKnowledgePoint.objects.create(
+            question=question, knowledge_point=self.knowledge, is_primary=True
+        )
+        question.status = Question.Status.PUBLISHED
+        question.save()
 
         self.assertTrue(question.can_publish())
         self.assertIn("函数极限", question.search_text)
         self.assertIn("第17届非数学A类初赛", question.search_text)
+
+    def test_reviewed_question_without_primary_knowledge_point_cannot_be_published(self):
+        question = self.create_reviewed_question()
+
+        self.assertFalse(question.can_publish())
+
+    def test_reviewed_question_without_review_time_cannot_be_published(self):
+        question = self.create_reviewed_question(reviewed_at=None)
+        QuestionKnowledgePoint.objects.create(
+            question=question, knowledge_point=self.knowledge, is_primary=True
+        )
+
+        self.assertFalse(question.can_publish())
+
+    def test_draft_question_cannot_be_published(self):
+        question = self.create_reviewed_question(status=Question.Status.DRAFT)
+        QuestionKnowledgePoint.objects.create(
+            question=question, knowledge_point=self.knowledge, is_primary=True
+        )
+
+        self.assertFalse(question.can_publish())
 
     def test_only_one_primary_knowledge_point_is_allowed(self):
         question = Question.objects.create(

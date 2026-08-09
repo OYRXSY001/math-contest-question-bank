@@ -166,15 +166,23 @@ class Question(models.Model):
         ]
 
     def can_publish(self):
+        if self.pk is None:
+            return False
+        has_one_primary = (
+            self.questionknowledgepoint_set.filter(is_primary=True).count() == 1
+        )
         return all(
             (
+                self.status in {self.Status.REVIEWED, self.Status.PUBLISHED},
                 self.text_checked,
                 self.formula_checked,
                 self.solution_checked,
                 self.reviewed_by_id is not None,
+                self.reviewed_at is not None,
                 self.unresolved_ocr_items == 0,
                 self.katex_errors == 0,
                 bool(self.solution_md.strip()),
+                has_one_primary,
             )
         )
 

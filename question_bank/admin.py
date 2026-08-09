@@ -108,7 +108,7 @@ class QuestionAdmin(admin.ModelAdmin):
         published = 0
         skipped = 0
         for question in queryset.select_related("paper", "reviewed_by"):
-            if question.can_publish():
+            if question.status == Question.Status.REVIEWED and question.can_publish():
                 question.status = Question.Status.PUBLISHED
                 question.save(update_fields=["status", "search_text", "updated_at"])
                 published += 1

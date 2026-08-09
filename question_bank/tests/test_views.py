@@ -3,8 +3,16 @@ from django.contrib.staticfiles import finders
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
-from question_bank.models import Favorite, Paper, Question, WrongQuestion
+from question_bank.models import (
+    Favorite,
+    KnowledgePoint,
+    Paper,
+    Question,
+    QuestionKnowledgePoint,
+    WrongQuestion,
+)
 from question_bank.templatetags.content import render_markdown
 
 
@@ -19,6 +27,9 @@ class PublicPageTests(TestCase):
             title="第17届非数学A类初赛",
             status="published",
         )
+        cls.knowledge = KnowledgePoint.objects.create(
+            name="函数极限", slug="function-limit", subject="calculus"
+        )
         cls.question = Question.objects.create(
             paper=cls.paper,
             question_no="1",
@@ -32,8 +43,14 @@ class PublicPageTests(TestCase):
             formula_checked=True,
             solution_checked=True,
             reviewed_by=reviewer,
-            status="published",
+            reviewed_at=timezone.now(),
+            status=Question.Status.REVIEWED,
         )
+        QuestionKnowledgePoint.objects.create(
+            question=cls.question, knowledge_point=cls.knowledge, is_primary=True
+        )
+        cls.question.status = Question.Status.PUBLISHED
+        cls.question.save()
         cls.draft_paper = Paper.objects.create(
             edition=16,
             stage="final",
@@ -256,9 +273,16 @@ class UserQuestionListTests(PublicPageTests):
                     formula_checked=True,
                     solution_checked=True,
                     reviewed_by=reviewer,
-                    status="published",
+                    reviewed_at=timezone.now(),
+                    status=Question.Status.REVIEWED,
                 )
             )
+        for question in questions:
+            QuestionKnowledgePoint.objects.create(
+                question=question, knowledge_point=self.knowledge, is_primary=True
+            )
+            question.status = Question.Status.PUBLISHED
+            question.save()
         Favorite.objects.bulk_create(Favorite(user=self.user, question=question) for question in questions)
         WrongQuestion.objects.bulk_create(WrongQuestion(user=self.user, question=question) for question in questions)
         self.client.force_login(self.user)

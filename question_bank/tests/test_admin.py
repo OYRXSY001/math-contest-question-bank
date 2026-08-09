@@ -5,9 +5,18 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import RequestFactory, TestCase, override_settings
+from django.utils import timezone
 
 from question_bank.admin import QuestionAdmin
-from question_bank.models import KnowledgePoint, Paper, Question
+from question_bank.models import KnowledgePoint, Paper, Question, QuestionKnowledgePoint
+
+
+class MessageCollector:
+    def __init__(self):
+        self.messages = []
+
+    def add(self, level, message, extra_tags=""):
+        self.messages.append(message)
 
 
 class KnowledgeSeedTests(TestCase):
@@ -74,11 +83,7 @@ class QuestionAdminReviewTests(TestCase):
         self.assertIn(r"\(x^2\)", preview)
 
     def test_publish_action_skips_unreviewed_question(self):
-        request = RequestFactory().post("/admin/")
-        request.user = self.staff
-        request._messages = type(
-            "Messages", (), {"add": lambda *args, **kwargs: None}
-        )()
+        request = self.publish_request()
 
         self.model_admin.publish_reviewed(
             request, Question.objects.filter(pk=self.question.pk)
@@ -86,3 +91,87 @@ class QuestionAdminReviewTests(TestCase):
 
         self.question.refresh_from_db()
         self.assertEqual(self.question.status, Question.Status.DRAFT)
+
+    def publish_request(self):
+        request = RequestFactory().post("/admin/")
+        request.user = self.staff
+        request._messages = MessageCollector()
+        return request
+
+    def mark_reviewed(self, question, **overrides):
+        values = {
+            "text_checked": True,
+            "formula_checked": True,
+            "solution_checked": True,
+            "reviewed_by": self.staff,
+            "reviewed_at": timezone.now(),
+            "status": Question.Status.REVIEWED,
+        }
+        values.update(overrides)
+        for field, value in values.items():
+            setattr(question, field, value)
+        question.save()
+
+    def test_publish_action_skips_question_without_review_time(self):
+        self.mark_reviewed(self.question, reviewed_at=None)
+        knowledge = KnowledgePoint.objects.create(
+            name="函数极限", slug="function-limit", subject="calculus"
+        )
+        QuestionKnowledgePoint.objects.create(
+            question=self.question, knowledge_point=knowledge, is_primary=True
+        )
+
+        self.model_admin.publish_reviewed(
+            self.publish_request(), Question.objects.filter(pk=self.question.pk)
+        )
+
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, Question.Status.REVIEWED)
+
+    def test_publish_action_skips_question_without_primary_knowledge_point(self):
+        self.mark_reviewed(self.question)
+
+        self.model_admin.publish_reviewed(
+            self.publish_request(), Question.objects.filter(pk=self.question.pk)
+        )
+
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, Question.Status.REVIEWED)
+
+    def test_publish_action_publishes_eligible_reviewed_question(self):
+        self.mark_reviewed(self.question)
+        knowledge = KnowledgePoint.objects.create(
+            name="函数极限", slug="function-limit", subject="calculus"
+        )
+        QuestionKnowledgePoint.objects.create(
+            question=self.question, knowledge_point=knowledge, is_primary=True
+        )
+
+        request = self.publish_request()
+        self.model_admin.publish_reviewed(
+            request, Question.objects.filter(pk=self.question.pk)
+        )
+
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, Question.Status.PUBLISHED)
+        self.assertEqual(request._messages.messages, ["已发布 1 题，跳过 0 题。"])
+
+    def test_publish_action_skips_already_published_question(self):
+        self.mark_reviewed(self.question)
+        knowledge = KnowledgePoint.objects.create(
+            name="函数极限", slug="function-limit", subject="calculus"
+        )
+        QuestionKnowledgePoint.objects.create(
+            question=self.question, knowledge_point=knowledge, is_primary=True
+        )
+        self.question.status = Question.Status.PUBLISHED
+        self.question.save()
+
+        request = self.publish_request()
+        self.model_admin.publish_reviewed(
+            request, Question.objects.filter(pk=self.question.pk)
+        )
+
+        self.question.refresh_from_db()
+        self.assertEqual(self.question.status, Question.Status.PUBLISHED)
+        self.assertEqual(request._messages.messages, ["已发布 0 题，跳过 1 题。"])

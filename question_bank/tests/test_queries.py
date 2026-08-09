@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.http import QueryDict
 from django.test import TestCase
+from django.utils import timezone
 
 from question_bank.models import (
     Favorite,
@@ -71,11 +72,14 @@ class QuestionQueryTests(TestCase):
             formula_checked=True,
             solution_checked=True,
             reviewed_by=cls.reviewer,
-            status="published",
+            reviewed_at=timezone.now(),
+            status=Question.Status.REVIEWED,
         )
         QuestionKnowledgePoint.objects.create(
             question=question, knowledge_point=knowledge, is_primary=True
         )
+        question.status = Question.Status.PUBLISHED
+        question.save()
         return question
 
     def test_same_dimension_is_or(self):
