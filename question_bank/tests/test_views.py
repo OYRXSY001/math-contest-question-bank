@@ -106,17 +106,27 @@ class PublicPageTests(TestCase):
             404,
         )
 
-    def test_paper_detail_with_uploaded_pdf_renders_before_download_route_exists(self):
+    def test_paper_detail_hides_download_when_pdf_is_missing(self):
+        response = self.client.get(reverse("paper-detail", args=[self.paper.pk]))
+
+        self.assertNotContains(response, reverse("paper-download", args=[self.paper.pk]))
+
+    def test_paper_detail_links_to_download_when_pdf_exists(self):
         upload = SimpleUploadedFile(
             "paper.pdf", b"%PDF-1.4\n%%EOF\n", content_type="application/pdf"
         )
         self.paper.pdf_file.save(upload.name, upload, save=True)
         self.addCleanup(self.paper.pdf_file.delete, save=False)
-        self.client.raise_request_exception = False
 
         response = self.client.get(reverse("paper-detail", args=[self.paper.pk]))
 
-        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, reverse("paper-download", args=[self.paper.pk]))
+        self.assertContains(response, "下载 PDF")
+
+    def test_paper_detail_uses_sticky_question_navigation(self):
+        response = self.client.get(reverse("paper-detail", args=[self.paper.pk]))
+
+        self.assertContains(response, 'class="question-number-nav')
 
     def test_markdown_escapes_raw_html_and_keeps_latex(self):
         rendered = str(render_markdown(r"<script>alert(1)</script> \(x^2\)"))
