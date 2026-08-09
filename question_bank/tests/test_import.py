@@ -104,6 +104,118 @@ class QuestionBankImportTests(TestCase):
 
         self.assertFalse(Paper.objects.exists())
 
+    def test_empty_inventory_is_rejected(self):
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, [])
+        self.write_workbook(questions, QUESTION_HEADERS, self.valid_rows()[1])
+
+        with self.assertRaisesMessage(CommandError, "inventory: 至少需要一行数据"):
+            call_command(
+                "import_question_bank",
+                inventory=str(inventory),
+                questions=str(questions),
+                dry_run=True,
+            )
+
+    def test_empty_questions_are_rejected(self):
+        inventory_rows, _ = self.valid_rows()
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, [])
+
+        with self.assertRaisesMessage(CommandError, "questions: 至少需要一行数据"):
+            call_command(
+                "import_question_bank",
+                inventory=str(inventory),
+                questions=str(questions),
+                dry_run=True,
+            )
+
+    def assert_question_is_rejected(self, question_row, reason):
+        inventory_rows, question_rows = self.valid_rows()
+        question_rows[0] = question_row
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        with self.assertRaisesMessage(CommandError, "questions 第2行") as error:
+            call_command(
+                "import_question_bank",
+                inventory=str(inventory),
+                questions=str(questions),
+            )
+
+        self.assertIn(reason, str(error.exception))
+        self.assertFalse(Paper.objects.exists())
+        self.assertFalse(Question.objects.exists())
+
+    def test_blank_ocr_confidence_is_rejected(self):
+        _, question_rows = self.valid_rows()
+        question = question_rows[0].copy()
+        question[14] = ""
+
+        self.assert_question_is_rejected(
+            question, "ocr_confidence: 必须是 0 到 1 之间的数字"
+        )
+
+    def test_out_of_range_ocr_confidence_is_rejected(self):
+        _, question_rows = self.valid_rows()
+
+        for confidence in (-0.01, 1.01):
+            with self.subTest(confidence=confidence):
+                question = question_rows[0].copy()
+                question[14] = confidence
+                self.assert_question_is_rejected(
+                    question, "ocr_confidence: 必须在 0 到 1 之间"
+                )
+
+    def test_low_ocr_confidence_without_ocr_items_is_rejected(self):
+        _, question_rows = self.valid_rows()
+        question = question_rows[0].copy()
+        question[14] = 0.89
+        question[15] = False
+        question[18] = 0
+
+        self.assert_question_is_rejected(
+            question,
+            "OCR 置信度低于 0.90 时必须登记 unresolved_ocr_items",
+        )
+
+    def test_low_ocr_confidence_with_checked_text_is_accepted(self):
+        inventory_rows, question_rows = self.valid_rows()
+        question_rows[0][14] = 0.89
+        question_rows[0][15] = True
+        question_rows[0][18] = 0
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        call_command(
+            "import_question_bank", inventory=str(inventory), questions=str(questions)
+        )
+
+        self.assertTrue(Question.objects.exists())
+
+    def test_unicode_replacement_character_in_stem_is_rejected(self):
+        _, question_rows = self.valid_rows()
+        question = question_rows[0].copy()
+        question[8] = "损坏的题干 �"
+
+        self.assert_question_is_rejected(
+            question, "stem_md: 包含Unicode 替换字符 �"
+        )
+
+    def test_empty_box_in_solution_is_rejected(self):
+        _, question_rows = self.valid_rows()
+        question = question_rows[0].copy()
+        question[10] = "损坏的解答 □"
+
+        self.assert_question_is_rejected(question, "solution_md: 包含空方框 □")
+
     def test_duplicate_question_rolls_back_whole_import(self):
         inventory_rows, question_rows = self.valid_rows()
         question_rows.append(question_rows[0].copy())

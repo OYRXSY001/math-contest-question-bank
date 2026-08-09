@@ -1,4 +1,5 @@
 from collections import Counter
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from django.conf import settings
@@ -28,6 +29,11 @@ QUESTION_HEADERS = [
     "text_checked", "formula_checked", "solution_checked", "unresolved_ocr_items",
     "katex_errors", "reviewer",
 ]
+MIN_OCR_CONFIDENCE = Decimal("0.90")
+SUSPICIOUS_OCR_CHARACTERS = {
+    "�": "Unicode 替换字符",
+    "□": "空方框",
+}
 
 
 def as_int(value, label, issues):
@@ -55,6 +61,29 @@ def as_bool(value, label, issues):
         return False
     issues.append(f"{label}: 必须是布尔值")
     return False
+
+
+def as_ocr_confidence(value, label, issues):
+    if value in (None, "") or isinstance(value, bool):
+        issues.append(f"{label}: 必须是 0 到 1 之间的数字")
+        return None
+    try:
+        confidence = Decimal(str(value).strip())
+    except (InvalidOperation, ValueError):
+        issues.append(f"{label}: 必须是 0 到 1 之间的数字")
+        return None
+    if not confidence.is_finite() or not Decimal("0") <= confidence <= Decimal("1"):
+        issues.append(f"{label}: 必须在 0 到 1 之间")
+        return None
+    return confidence
+
+
+def validate_ocr_characters(row, label, issues):
+    for field in ("stem_md", "answer_md", "solution_md"):
+        text = str(row.get(field) or "")
+        for character, name in SUSPICIOUS_OCR_CHARACTERS.items():
+            if character in text:
+                issues.append(f"{label} {field}: 包含{name} {character}")
 
 
 def split_values(value):
@@ -101,6 +130,10 @@ class Command(BaseCommand):
         paper_rows = self.read_rows(Path(options["inventory"]), INVENTORY_HEADERS, "inventory")
         question_rows = self.read_rows(Path(options["questions"]), QUESTION_HEADERS, "questions")
         issues = []
+        if not paper_rows:
+            issues.append("inventory: 至少需要一行数据")
+        if not question_rows:
+            issues.append("questions: 至少需要一行数据")
         papers = self.validate_papers(paper_rows, issues)
         questions = self.validate_questions(question_rows, papers, issues)
         self.validate_counts(papers, questions, issues)
@@ -258,6 +291,23 @@ class Command(BaseCommand):
             if unresolved < 0 or katex_errors < 0:
                 issues.append(f"{label}: OCR 和 KaTeX 错误数不能为负数")
 
+            text_checked = as_bool(
+                row.get("text_checked"), f"{label} text_checked", issues
+            )
+            confidence = as_ocr_confidence(
+                row.get("ocr_confidence"), f"{label} ocr_confidence", issues
+            )
+            if (
+                confidence is not None
+                and confidence < MIN_OCR_CONFIDENCE
+                and not text_checked
+                and unresolved == 0
+            ):
+                issues.append(
+                    f"{label}: OCR 置信度低于 0.90 时必须登记 unresolved_ocr_items"
+                )
+            validate_ocr_characters(row, label, issues)
+
             row.update({
                 "_edition": edition,
                 "_stage": stage,
@@ -266,12 +316,11 @@ class Command(BaseCommand):
                 "_source_page": source_page,
                 "_unresolved": unresolved,
                 "_katex_errors": katex_errors,
+                "_ocr_confidence": confidence,
                 "_primary": primary,
                 "_secondary": secondary,
                 "_reviewer": users.get(reviewer_name),
-                "_text_checked": as_bool(
-                    row.get("text_checked"), f"{label} text_checked", issues
-                ),
+                "_text_checked": text_checked,
                 "_formula_checked": as_bool(
                     row.get("formula_checked"), f"{label} formula_checked", issues
                 ),
