@@ -194,6 +194,8 @@ class Question(models.Model):
         self.search_text = normalize_search_text(
             self.paper.title, self.stem_md, self.answer_md, self.solution_md
         )
+        if kwargs.get("update_fields") is not None:
+            kwargs["update_fields"] = set(kwargs["update_fields"]) | {"search_text"}
         self.full_clean()
         return super().save(*args, **kwargs)
 

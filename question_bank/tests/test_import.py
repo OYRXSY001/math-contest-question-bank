@@ -4,6 +4,7 @@ from pathlib import Path
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.http import QueryDict
 from django.test import TestCase, override_settings
 from openpyxl import Workbook
 
@@ -12,7 +13,9 @@ from question_bank.management.commands.import_question_bank import (
     INVENTORY_HEADERS,
     QUESTION_HEADERS,
 )
-from question_bank.models import KnowledgePoint, Paper, Question
+from question_bank.models import Favorite, KnowledgePoint, Paper, Question, WrongQuestion
+from question_bank.queries import filtered_questions
+from question_bank.templatetags.content import render_markdown
 
 
 class QuestionBankImportTests(TestCase):
@@ -93,6 +96,89 @@ class QuestionBankImportTests(TestCase):
         self.assertEqual(question.paper.edition, 17)
         self.assertEqual(question.knowledge_points.get(), self.knowledge)
         self.assertEqual(question.status, "reviewed")
+
+    def test_reimport_refreshes_denormalized_search_text(self):
+        inventory_rows, question_rows = self.valid_rows()
+        question_rows[0][8] = "OriginalSearchTerm"
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+        call_command(
+            "import_question_bank",
+            inventory=str(inventory),
+            questions=str(questions),
+        )
+
+        question_rows[0][8] = "UpdatedSearchTerm"
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+        call_command(
+            "import_question_bank",
+            inventory=str(inventory),
+            questions=str(questions),
+        )
+
+        question = Question.objects.get()
+        self.assertIn("UpdatedSearchTerm", question.search_text)
+        self.assertNotIn("OriginalSearchTerm", question.search_text)
+
+    def test_reimport_demotes_removed_question_without_deleting_its_records(self):
+        inventory_rows, question_rows = self.valid_rows()
+        removed_row = question_rows[0].copy()
+        removed_row[2] = "2"
+        removed_row[3] = 2
+        question_rows.append(removed_row)
+        inventory_rows[0][-1] = 2
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+        call_command(
+            "import_question_bank",
+            inventory=str(inventory),
+            questions=str(questions),
+        )
+
+        paper = Paper.objects.get()
+        paper.status = Paper.Status.PUBLISHED
+        paper.save(update_fields=["status"])
+        paper.pdf_file.close()
+        for question in Question.objects.all():
+            question.status = Question.Status.PUBLISHED
+            question.save(update_fields=["status"])
+        kept = Question.objects.get(question_no="1")
+        removed = Question.objects.get(question_no="2")
+        Favorite.objects.create(user=self.reviewer, question=removed)
+        WrongQuestion.objects.create(user=self.reviewer, question=removed)
+
+        inventory_rows[0][-1] = 1
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, [question_rows[0]])
+        call_command(
+            "import_question_bank",
+            inventory=str(inventory),
+            questions=str(questions),
+        )
+
+        removed.refresh_from_db()
+        self.assertEqual(removed.status, Question.Status.DRAFT)
+        self.assertTrue(Question.objects.filter(pk=removed.pk).exists())
+        self.assertEqual(removed.questionknowledgepoint_set.count(), 1)
+        self.assertTrue(Favorite.objects.filter(question=removed).exists())
+        self.assertTrue(WrongQuestion.objects.filter(question=removed).exists())
+
+        paper.refresh_from_db()
+        paper.status = Paper.Status.PUBLISHED
+        paper.save(update_fields=["status"])
+        paper.pdf_file.close()
+        kept.refresh_from_db()
+        kept.status = Question.Status.PUBLISHED
+        kept.save(update_fields=["status"])
+        public_questions, _ = filtered_questions(QueryDict())
+        self.assertSetEqual(
+            set(public_questions.values_list("pk", flat=True)),
+            {kept.pk},
+        )
 
     def test_dry_run_does_not_write(self):
         inventory_rows, question_rows = self.valid_rows()
@@ -417,11 +503,54 @@ class QuestionBankImportTests(TestCase):
 
         self.assert_question_is_rejected(question, "image_files: 图片未在题干、答案或解析中引用")
 
+    def test_declared_image_must_be_inside_questions_directory(self):
+        image = self.write_valid_png("uploads/q1.png")
+        _, question_rows = self.valid_rows()
+        question = question_rows[0].copy()
+        question[11] = image
+        question[8] += f" ![diagram](/media/{image})"
+
+        self.assert_question_is_rejected(
+            question,
+            "image_files: 图片路径必须位于 questions/ 目录",
+        )
+
+    def test_bare_relative_declared_image_url_is_rejected(self):
+        image = self.write_valid_png()
+        _, question_rows = self.valid_rows()
+        question = question_rows[0].copy()
+        question[11] = image
+        question[8] += f" ![diagram]({image})"
+
+        self.assert_question_is_rejected(
+            question,
+            "image_files: 图片未在题干、答案或解析中引用",
+        )
+
+    def test_canonical_image_url_must_be_an_actual_rendered_image(self):
+        image = self.write_valid_png()
+        canonical_url = f"/media/{image}"
+
+        for markdown in (
+            f"Image path: {canonical_url}",
+            f"[image link]({canonical_url})",
+        ):
+            with self.subTest(markdown=markdown):
+                _, question_rows = self.valid_rows()
+                question = question_rows[0].copy()
+                question[11] = image
+                question[8] += f" {markdown}"
+
+                self.assert_question_is_rejected(
+                    question,
+                    "image_files: 图片未在题干、答案或解析中引用",
+                )
+
     def test_valid_declared_image_referenced_in_stem_is_accepted(self):
         image = self.write_valid_png()
         inventory_rows, question_rows = self.valid_rows()
         question_rows[0][11] = image
-        question_rows[0][8] += f" ![题图]({image})"
+        question_rows[0][8] += f" ![diagram](/media/{image})"
         inventory = self.root / "inventory.xlsx"
         questions = self.root / "questions.xlsx"
         self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
@@ -436,3 +565,7 @@ class QuestionBankImportTests(TestCase):
             )
         except CommandError as error:
             self.fail(f"valid declared image was rejected: {error}")
+
+        rendered = str(render_markdown(f"![diagram](/media/{image})"))
+        self.assertIn("<img ", rendered)
+        self.assertIn(f'src="/media/{image}"', rendered)

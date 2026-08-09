@@ -1,5 +1,6 @@
 from collections import Counter
 from decimal import Decimal, InvalidOperation
+from html.parser import HTMLParser
 from pathlib import Path
 
 from django.conf import settings
@@ -17,6 +18,7 @@ from question_bank.models import (
     Question,
     QuestionKnowledgePoint,
 )
+from question_bank.templatetags.content import render_markdown
 
 INVENTORY_HEADERS = [
     "edition", "stage", "original_category_label", "title", "exam_year",
@@ -126,11 +128,42 @@ def image_signature_matches(path):
     return False
 
 
-def validate_question_image(root, relative, label, markdown_text, issues):
+class _ImageSourceParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.sources = set()
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() == "img":
+            source = dict(attrs).get("src")
+            if source is not None:
+                self.sources.add(source)
+
+    def handle_startendtag(self, tag, attrs):
+        self.handle_starttag(tag, attrs)
+
+
+def rendered_image_sources(markdown_sources):
+    parser = _ImageSourceParser()
+    for source in markdown_sources:
+        parser.feed(str(render_markdown(source)))
+    parser.close()
+    return parser.sources
+
+
+def validate_question_image(root, relative, label, markdown_sources, issues):
     root = Path(root).resolve()
-    target = (root / str(relative)).resolve()
+    relative = str(relative)
+    normalized_relative = relative.replace("\\", "/")
+    target = (root / relative).resolve()
     if not target.is_relative_to(root):
         issues.append(f"{label}: 路径超出允许目录")
+        return
+    if (
+        not normalized_relative.startswith("questions/")
+        or not target.is_relative_to((root / "questions").resolve())
+    ):
+        issues.append(f"{label}: 图片路径必须位于 questions/ 目录")
         return
     if not target.is_file():
         issues.append(f"{label}: 文件不存在 {relative}")
@@ -144,7 +177,8 @@ def validate_question_image(root, relative, label, markdown_text, issues):
     if not image_signature_matches(target):
         issues.append(f"{label}: 图片内容与扩展名不匹配")
         return
-    if str(relative) not in markdown_text:
+    public_url = f"{settings.MEDIA_URL.rstrip('/')}/{normalized_relative}"
+    if public_url not in rendered_image_sources(markdown_sources):
         issues.append(f"{label}: 图片未在题干、答案或解析中引用")
 
 
@@ -311,7 +345,7 @@ class Command(BaseCommand):
             reviewer_name = str(row.get("reviewer") or "").strip()
             if reviewer_name and reviewer_name not in users:
                 issues.append(f"{label}: reviewer 用户不存在 {reviewer_name}")
-            markdown_text = "\n".join(
+            markdown_sources = tuple(
                 str(row.get(field) or "")
                 for field in ("stem_md", "answer_md", "solution_md")
             )
@@ -320,7 +354,7 @@ class Command(BaseCommand):
                     settings.MEDIA_ROOT,
                     image,
                     f"{label} image_files",
-                    markdown_text,
+                    markdown_sources,
                     issues,
                 )
             safe_file(settings.REVIEW_ROOT, row.get("source_crop"), f"{label} source_crop", issues)
@@ -404,13 +438,16 @@ class Command(BaseCommand):
             paper_objects[key] = paper
 
         knowledge = {point.slug: point for point in KnowledgePoint.objects.all()}
+        active_numbers = {key: set() for key in papers}
         for row in questions:
+            paper_key = (row["_edition"], row["_stage"])
+            active_numbers[paper_key].add(row["_number"])
             reviewed = all((
                 row["_text_checked"], row["_formula_checked"], row["_solution_checked"],
                 row["_reviewer"] is not None, row["_unresolved"] == 0, row["_katex_errors"] == 0,
             ))
             question, _ = Question.objects.update_or_create(
-                paper=paper_objects[(row["_edition"], row["_stage"])],
+                paper=paper_objects[paper_key],
                 question_no=row["_number"],
                 defaults={
                     "sort_order": row["_sort_order"],
@@ -443,3 +480,9 @@ class Command(BaseCommand):
                     knowledge_point=knowledge[slug],
                     is_primary=False,
                 )
+
+        stale_updated_at = timezone.now()
+        for key, paper in paper_objects.items():
+            Question.objects.filter(paper=paper).exclude(
+                question_no__in=active_numbers[key]
+            ).update(status=Question.Status.DRAFT, updated_at=stale_updated_at)

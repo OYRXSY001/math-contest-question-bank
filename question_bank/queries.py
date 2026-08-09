@@ -27,6 +27,7 @@ def filtered_questions(params, base_queryset=None):
         keyword = data["q"].strip()
         queryset = queryset.filter(
             Q(search_text__icontains=keyword)
+            | Q(paper__title__icontains=keyword)
             | Q(knowledge_points__name__icontains=keyword)
         )
 

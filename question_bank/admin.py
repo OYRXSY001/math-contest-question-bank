@@ -4,6 +4,8 @@ from pathlib import Path
 
 from django.contrib import admin
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.forms.models import BaseInlineFormSet
 from django.utils.html import format_html
 
 from .templatetags.content import render_markdown
@@ -17,8 +19,28 @@ from .models import (
 )
 
 
+class QuestionKnowledgeInlineFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors) or self.instance.status != Question.Status.PUBLISHED:
+            return
+
+        primary_count = sum(
+            1
+            for form in self.forms
+            if form.cleaned_data
+            and not form.cleaned_data.get("DELETE", False)
+            and form.cleaned_data.get("is_primary", False)
+        )
+        if primary_count != 1:
+            raise ValidationError(
+                "Published questions must have exactly one primary knowledge point."
+            )
+
+
 class QuestionKnowledgeInline(admin.TabularInline):
     model = QuestionKnowledgePoint
+    formset = QuestionKnowledgeInlineFormSet
     extra = 0
 
 

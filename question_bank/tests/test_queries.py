@@ -108,6 +108,17 @@ class QuestionQueryTests(TestCase):
 
         self.assertEqual(list(questions), [self.q_final])
 
+    def test_keyword_searches_current_paper_title_after_rename(self):
+        self.preliminary.title = "RenamedPaperSearchTerm"
+        self.preliminary.save(update_fields=["title"])
+
+        questions, _ = filtered_questions(QueryDict("q=RenamedPaperSearchTerm"))
+
+        self.assertSetEqual(
+            set(questions.values_list("pk", flat=True)),
+            {self.q_limit.pk, self.q_continuity.pk},
+        )
+
     def test_invalid_filter_returns_no_results(self):
         questions, form = filtered_questions(QueryDict("edition=18"))
 

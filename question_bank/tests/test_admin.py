@@ -7,7 +7,7 @@ from django.core.management import call_command
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 
-from question_bank.admin import QuestionAdmin
+from question_bank.admin import QuestionAdmin, QuestionKnowledgeInline
 from question_bank.models import KnowledgePoint, Paper, Question, QuestionKnowledgePoint
 
 
@@ -111,6 +111,84 @@ class QuestionAdminReviewTests(TestCase):
         for field, value in values.items():
             setattr(question, field, value)
         question.save()
+
+    def publish_with_primary_knowledge(self):
+        self.mark_reviewed(self.question)
+        knowledge = KnowledgePoint.objects.create(
+            name="Primary knowledge", slug="primary-knowledge", subject="calculus"
+        )
+        relation = QuestionKnowledgePoint.objects.create(
+            question=self.question, knowledge_point=knowledge, is_primary=True
+        )
+        self.question.status = Question.Status.PUBLISHED
+        self.question.save()
+        return relation
+
+    def inline_formset(self, rows, initial_forms=1):
+        inline = QuestionKnowledgeInline(Question, admin.site)
+        formset_class = inline.get_formset(self.publish_request(), self.question)
+        prefix = formset_class.get_default_prefix()
+        data = {
+            f"{prefix}-TOTAL_FORMS": str(len(rows)),
+            f"{prefix}-INITIAL_FORMS": str(initial_forms),
+            f"{prefix}-MIN_NUM_FORMS": "0",
+            f"{prefix}-MAX_NUM_FORMS": "1000",
+        }
+        for index, row in enumerate(rows):
+            for field, value in row.items():
+                data[f"{prefix}-{index}-{field}"] = value
+        return formset_class(data=data, instance=self.question)
+
+    def test_published_question_cannot_delete_its_only_primary_inline(self):
+        relation = self.publish_with_primary_knowledge()
+        formset = self.inline_formset(
+            [
+                {
+                    "id": str(relation.pk),
+                    "knowledge_point": str(relation.knowledge_point_id),
+                    "is_primary": "on",
+                    "DELETE": "on",
+                }
+            ]
+        )
+
+        self.assertFalse(formset.is_valid())
+        self.assertIn(
+            "exactly one primary knowledge point", str(formset.non_form_errors())
+        )
+
+    def test_published_question_can_replace_primary_inline(self):
+        relation = self.publish_with_primary_knowledge()
+        replacement = KnowledgePoint.objects.create(
+            name="Replacement knowledge",
+            slug="replacement-knowledge",
+            subject="calculus",
+        )
+        formset = self.inline_formset(
+            [
+                {
+                    "id": str(relation.pk),
+                    "knowledge_point": str(relation.knowledge_point_id),
+                    "is_primary": "on",
+                    "DELETE": "on",
+                },
+                {
+                    "knowledge_point": str(replacement.pk),
+                    "is_primary": "on",
+                },
+            ]
+        )
+
+        self.assertTrue(formset.is_valid(), formset.errors)
+        formset.save()
+        self.assertEqual(
+            list(
+                self.question.questionknowledgepoint_set.filter(
+                    is_primary=True
+                ).values_list("knowledge_point_id", flat=True)
+            ),
+            [replacement.pk],
+        )
 
     def test_publish_action_skips_question_without_review_time(self):
         self.mark_reviewed(self.question, reviewed_at=None)

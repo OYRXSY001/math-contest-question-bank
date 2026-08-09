@@ -4,7 +4,7 @@
 
 **Goal:** Enforce the approved question-publication gates, reject incomplete or unsafe workbook imports, and restore the PDF and sticky question-navigation UI.
 
-**Architecture:** Keep the existing Django monolith and its model, management-command, Admin, and template boundaries. Add validation at the model and workbook-preflight layers, with no schema or dependency changes. Each task follows Django `TestCase` red-green-refactor cycles and lands as one focused commit.
+**Architecture:** Keep the existing Django monolith and its model, management-command, Admin, query, template, and Caddy boundaries. Add validation at the model, Admin formset, workbook-preflight, and production file-serving layers, with no schema or dependency changes. Each task follows Django `TestCase` red-green-refactor cycles and lands as one focused commit.
 
 **Tech Stack:** Python 3.12+, Django 5.2, SQLite, openpyxl, Django templates, Bootstrap 5, built-in Django test runner.
 
@@ -17,6 +17,7 @@
 - Every published question must have non-empty detailed analysis, status `reviewed` or `published`, one primary knowledge point, a reviewer, a review timestamp, all three review flags, zero OCR issues, and zero KaTeX errors.
 - Keep formulas as LaTeX inside Markdown; keep diagrams as image files.
 - Public pages show only `published` papers and questions.
+- Caddy may serve only `/media/questions/*` directly; paper PDFs remain behind `paper-download`.
 - Do not add Python or Node dependencies and do not create a database migration.
 - Use built-in Django tests; do not add pytest.
 - Tests for new or repaired behavior must fail for the expected reason before production changes; regression tests that preserve existing safe behavior may already pass.
@@ -27,12 +28,18 @@
 Only these tracked files change during implementation:
 
 ```text
+deploy/Caddyfile
+docs/superpowers/
+├── plans/2026-08-09-question-bank-core-hardening.md
+└── specs/2026-08-09-question-bank-core-hardening-design.md
 question_bank/
 ├── admin.py
 ├── models.py
+├── queries.py
 ├── management/commands/import_question_bank.py
 └── tests/
     ├── test_admin.py
+    ├── test_deploy.py
     ├── test_import.py
     ├── test_models.py
     ├── test_queries.py
@@ -519,6 +526,46 @@ Expected: all page and user-list tests pass.
 git add templates/question_bank/paper_detail.html question_bank/tests/test_views.py
 git commit -m "fix: restore paper detail actions"
 ```
+
+---
+
+## Approved Final-Review Fix Wave
+
+This addendum records the final behavior without rewriting the completed task history above. The wave is delivered as one commit with subject `fix: close final review blockers`.
+
+### Production media contract
+
+- `deploy/Caddyfile` has a single public media handler: `handle_path /media/questions/*` rooted at `/srv/cmc-a/media/questions`.
+- The general `/media/*` file server is absent. `/media/papers/*` falls through to production Django and returns 404; PDFs continue through `paper-download`.
+- `question_bank/tests/test_deploy.py` parses the file-server blocks and protects both the route and matching filesystem root.
+
+### Canonical rendered image references
+
+- Every `image_files` value resolves inside `MEDIA_ROOT/questions/`.
+- Its accepted Markdown URL is `settings.MEDIA_URL.rstrip("/") + "/" + relative_path_with_forward_slashes`, such as `/media/questions/q1.png`.
+- Validation renders each content field through the existing safe Markdown boundary, parses actual `<img src>` attributes, and rejects relative image URLs, ordinary text, code, and normal links.
+
+### Admin inline final state
+
+- `QuestionKnowledgeInline` uses a custom `BaseInlineFormSet`.
+- A published parent is valid only when the submitted, non-deleted final row set contains exactly one primary knowledge point.
+- Deleting the old primary and adding one replacement in the same submission remains valid and saves successfully.
+
+### Current search behavior
+
+- `Question.save(update_fields=...)` always merges `search_text` into the supplied fields after rebuilding it.
+- Keyword filtering also queries `paper__title__icontains`, so a paper rename is immediately searchable without rewriting all related questions.
+- The openpyxl repeated-import regression proves new question content replaces old denormalized search text.
+
+### Authoritative workbook removals
+
+- For every paper present in the inventory workbook, its question rows are the authoritative active `question_no` set.
+- After upserts and within the existing atomic transaction, absent existing question numbers are bulk-demoted to `draft` with `updated_at` refreshed.
+- Demotion never deletes questions, knowledge relations, favorites, or wrong-question records, and papers omitted from inventory are untouched.
+
+### Final-wave verification
+
+Run the focused RED/GREEN commands recorded in `.superpowers/sdd/2026-08-09-question-bank-core-hardening/final-fix-report.md`, then run the complete Django suite, system check, migration drift check, and `git diff --check` before committing.
 
 ---
 

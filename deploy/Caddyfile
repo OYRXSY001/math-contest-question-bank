@@ -6,8 +6,8 @@
         file_server
     }
 
-    handle_path /media/* {
-        root * /srv/cmc-a/media
+    handle_path /media/questions/* {
+        root * /srv/cmc-a/media/questions
         file_server
     }
 
