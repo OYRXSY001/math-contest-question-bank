@@ -33,6 +33,8 @@ def normalize_search_text(*parts):
 class Paper(models.Model):
     class Stage(models.TextChoices):
         PRELIMINARY = "preliminary", "初赛"
+        PRELIMINARY_B = "preliminary_b", "初赛（B类）"
+        FINAL_B = "final_b", "决赛（B类）"
         FINAL = "final", "决赛"
 
     class Status(models.TextChoices):
@@ -72,7 +74,7 @@ class Paper(models.Model):
                 name="paper_scope_non_math_a",
             ),
             models.CheckConstraint(
-                condition=Q(stage__in=["preliminary", "final"]),
+                condition=Q(stage__in=["preliminary", "preliminary_b", "final", "final_b"]),
                 name="paper_stage_preliminary_or_final",
             ),
             models.UniqueConstraint(
