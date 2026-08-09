@@ -70,6 +70,7 @@ def validate_markdown_formulas(items):
             ["node", str(settings.BASE_DIR / "scripts" / "validate-katex.mjs")],
             input=json.dumps(formulas, ensure_ascii=False),
             text=True,
+            encoding="utf-8",
             capture_output=True,
             timeout=30,
             check=False,

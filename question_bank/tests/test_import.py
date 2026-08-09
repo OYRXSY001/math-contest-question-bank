@@ -1,5 +1,6 @@
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
@@ -419,6 +420,15 @@ class QuestionBankImportTests(TestCase):
             extract_formulas(r"\(x+1\) and \[y^2\]"),
             ["x+1", "y^2"],
         )
+
+    @patch("question_bank.katex.subprocess.run")
+    def test_katex_output_is_decoded_as_utf8(self, run):
+        run.return_value.returncode = 0
+        run.return_value.stdout = "[]"
+        run.return_value.stderr = ""
+
+        self.assertEqual(validate_markdown_formulas([("stem", r"\(x+1\)")]), [])
+        self.assertEqual(run.call_args.kwargs["encoding"], "utf-8")
 
     def test_reversed_formula_delimiters_roll_back_whole_import(self):
         inventory_rows, question_rows = self.valid_rows()
