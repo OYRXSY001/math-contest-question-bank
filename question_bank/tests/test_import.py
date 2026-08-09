@@ -49,6 +49,12 @@ class QuestionBankImportTests(TestCase):
         crop.write_bytes(b"fake-png-review-copy")
         return pdf.name, crop.name
 
+    def write_valid_png(self, relative="questions/q1.png"):
+        path = self.media / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"\x89PNG\r\n\x1a\nvalid-test-image")
+        return relative
+
     def valid_rows(self):
         pdf_name, crop_name = self.valid_files()
         inventory = [[
@@ -362,3 +368,71 @@ class QuestionBankImportTests(TestCase):
             self.fail("CommandError not raised")
 
         self.assertFalse(Paper.objects.exists())
+
+    def test_image_path_escape_is_rejected(self):
+        _, question_rows = self.valid_rows()
+        question = question_rows[0].copy()
+        question[11] = "../escaped.png"
+
+        self.assert_question_is_rejected(question, "image_files: 路径超出允许目录")
+
+    def test_svg_image_is_rejected(self):
+        svg = self.media / "questions/q1.svg"
+        svg.parent.mkdir(parents=True, exist_ok=True)
+        svg.write_bytes(b"<svg></svg>")
+        _, question_rows = self.valid_rows()
+        question = question_rows[0].copy()
+        question[11] = "questions/q1.svg"
+        question[8] += " ![题图](questions/q1.svg)"
+
+        self.assert_question_is_rejected(question, "image_files: 图片扩展名必须是 .png、.jpg、.jpeg 或 .webp")
+
+    def test_png_with_invalid_signature_is_rejected(self):
+        png = self.media / "questions/q1.png"
+        png.parent.mkdir(parents=True, exist_ok=True)
+        png.write_bytes(b"not-a-png")
+        _, question_rows = self.valid_rows()
+        question = question_rows[0].copy()
+        question[11] = "questions/q1.png"
+        question[8] += " ![题图](questions/q1.png)"
+
+        self.assert_question_is_rejected(question, "image_files: 图片内容与扩展名不匹配")
+
+    def test_image_larger_than_ten_mib_is_rejected(self):
+        png = self.media / "questions/q1.png"
+        png.parent.mkdir(parents=True, exist_ok=True)
+        png.write_bytes(b"\x89PNG\r\n\x1a\n" + b"x" * (10 * 1024 * 1024))
+        _, question_rows = self.valid_rows()
+        question = question_rows[0].copy()
+        question[11] = "questions/q1.png"
+        question[8] += " ![题图](questions/q1.png)"
+
+        self.assert_question_is_rejected(question, "image_files: 图片不能超过 10 MiB")
+
+    def test_declared_image_must_be_referenced_in_markdown(self):
+        image = self.write_valid_png()
+        _, question_rows = self.valid_rows()
+        question = question_rows[0].copy()
+        question[11] = image
+
+        self.assert_question_is_rejected(question, "image_files: 图片未在题干、答案或解析中引用")
+
+    def test_valid_declared_image_referenced_in_stem_is_accepted(self):
+        image = self.write_valid_png()
+        inventory_rows, question_rows = self.valid_rows()
+        question_rows[0][11] = image
+        question_rows[0][8] += f" ![题图]({image})"
+        inventory = self.root / "inventory.xlsx"
+        questions = self.root / "questions.xlsx"
+        self.write_workbook(inventory, INVENTORY_HEADERS, inventory_rows)
+        self.write_workbook(questions, QUESTION_HEADERS, question_rows)
+
+        try:
+            call_command(
+                "import_question_bank",
+                inventory=str(inventory),
+                questions=str(questions),
+                dry_run=True,
+            )
+        except CommandError as error:
+            self.fail(f"valid declared image was rejected: {error}")

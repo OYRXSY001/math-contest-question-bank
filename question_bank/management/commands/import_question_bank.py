@@ -30,6 +30,8 @@ QUESTION_HEADERS = [
     "katex_errors", "reviewer",
 ]
 MIN_OCR_CONFIDENCE = Decimal("0.90")
+MAX_IMAGE_BYTES = 10 * 1024 * 1024
+IMAGE_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
 SUSPICIOUS_OCR_CHARACTERS = {
     "�": "Unicode 替换字符",
     "□": "空方框",
@@ -109,6 +111,41 @@ def safe_file(root, relative, label, issues, pdf=False):
         with target.open("rb") as source:
             if source.read(5) != b"%PDF-":
                 issues.append(f"{label}: 文件内容不是 PDF")
+
+
+def image_signature_matches(path):
+    with path.open("rb") as source:
+        header = source.read(12)
+    suffix = path.suffix.lower()
+    if suffix == ".png":
+        return header.startswith(b"\x89PNG\r\n\x1a\n")
+    if suffix in {".jpg", ".jpeg"}:
+        return header.startswith(b"\xff\xd8\xff")
+    if suffix == ".webp":
+        return header.startswith(b"RIFF") and header[8:12] == b"WEBP"
+    return False
+
+
+def validate_question_image(root, relative, label, markdown_text, issues):
+    root = Path(root).resolve()
+    target = (root / str(relative)).resolve()
+    if not target.is_relative_to(root):
+        issues.append(f"{label}: 路径超出允许目录")
+        return
+    if not target.is_file():
+        issues.append(f"{label}: 文件不存在 {relative}")
+        return
+    if target.suffix.lower() not in IMAGE_SUFFIXES:
+        issues.append(f"{label}: 图片扩展名必须是 .png、.jpg、.jpeg 或 .webp")
+        return
+    if target.stat().st_size > MAX_IMAGE_BYTES:
+        issues.append(f"{label}: 图片不能超过 10 MiB")
+        return
+    if not image_signature_matches(target):
+        issues.append(f"{label}: 图片内容与扩展名不匹配")
+        return
+    if str(relative) not in markdown_text:
+        issues.append(f"{label}: 图片未在题干、答案或解析中引用")
 
 
 class Command(BaseCommand):
@@ -274,8 +311,18 @@ class Command(BaseCommand):
             reviewer_name = str(row.get("reviewer") or "").strip()
             if reviewer_name and reviewer_name not in users:
                 issues.append(f"{label}: reviewer 用户不存在 {reviewer_name}")
+            markdown_text = "\n".join(
+                str(row.get(field) or "")
+                for field in ("stem_md", "answer_md", "solution_md")
+            )
             for image in split_values(row.get("image_files")):
-                safe_file(settings.MEDIA_ROOT, image, f"{label} image_files", issues)
+                validate_question_image(
+                    settings.MEDIA_ROOT,
+                    image,
+                    f"{label} image_files",
+                    markdown_text,
+                    issues,
+                )
             safe_file(settings.REVIEW_ROOT, row.get("source_crop"), f"{label} source_crop", issues)
 
             sort_order = as_int(row.get("sort_order"), f"{label} sort_order", issues)
