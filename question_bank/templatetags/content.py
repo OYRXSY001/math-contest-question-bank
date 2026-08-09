@@ -10,6 +10,7 @@ URL_ATTRIBUTE_RE = re.compile(
     r"""(?P<attribute>\b(?:href|src))\s*=\s*(?P<quote>["'])(?P<url>.*?)(?P=quote)""",
     re.IGNORECASE | re.DOTALL,
 )
+LATEX_RE = re.compile(r"\\\[.*?\\\]|\\\(.*?\\\)", re.DOTALL)
 
 
 def _unescape_url(value):
@@ -43,33 +44,31 @@ def _sanitize_url_attributes(rendered):
     return URL_ATTRIBUTE_RE.sub(replace, rendered)
 
 
-def _latex_placeholders(value):
-    index = 0
-    while True:
-        marker = f"\ue000katex-delimiter-{index}\ue001"
-        placeholders = {
-            r"\[": f"{marker}-display-open",
-            r"\]": f"{marker}-display-close",
-            r"\(": f"{marker}-inline-open",
-            r"\)": f"{marker}-inline-close",
-        }
-        if not any(placeholder in value for placeholder in placeholders.values()):
-            return placeholders
-        index += 1
+def _protect_latex(value):
+    placeholders = {}
+
+    def replace(match):
+        index = len(placeholders)
+        marker = f"\ue000katex-formula-{index}\ue001"
+        while marker in value or marker in placeholders:
+            index += 1
+            marker = f"\ue000katex-formula-{index}\ue001"
+        placeholders[marker] = match.group()
+        return marker
+
+    return LATEX_RE.sub(replace, value), placeholders
 
 
 @register.filter
 def render_markdown(value):
     escaped = escape(value or "")
-    placeholders = _latex_placeholders(escaped)
-    for delimiter, placeholder in placeholders.items():
-        escaped = escaped.replace(delimiter, placeholder)
+    escaped, placeholders = _protect_latex(escaped)
     rendered = markdown.markdown(
         escaped,
         extensions=["extra", "sane_lists", "nl2br"],
         output_format="html5",
     )
     rendered = _sanitize_url_attributes(rendered)
-    for delimiter, placeholder in placeholders.items():
-        rendered = rendered.replace(placeholder, delimiter)
+    for placeholder, formula in placeholders.items():
+        rendered = rendered.replace(placeholder, formula)
     return mark_safe(rendered)

@@ -135,6 +135,15 @@ class PublicPageTests(TestCase):
         self.assertIn("&lt;script&gt;", rendered)
         self.assertIn(r"\(x^2\)", rendered)
 
+    def test_markdown_does_not_parse_latex_underscores_as_emphasis(self):
+        source = r"设 \(\{a_n\}_{n=0}^\infty\)，且 \(a_{n+p}-a_n\to\lambda\)。"
+
+        rendered = str(render_markdown(source))
+
+        self.assertIn(r"\(\{a_n\}_{n=0}^\infty\)", rendered)
+        self.assertIn(r"\(a_{n+p}-a_n\to\lambda\)", rendered)
+        self.assertNotIn("<em", rendered)
+
     def test_markdown_drops_dangerous_link_and_image_uris(self):
         rendered = str(
             render_markdown(
@@ -180,6 +189,15 @@ class PublicPageTests(TestCase):
 
         self.assertIn("\ue000 \ue001 \ue002 \ue003", rendered)
         self.assertIn(r"\(x^2\)", rendered)
+
+    def test_markdown_latex_placeholders_do_not_collide_with_source(self):
+        source = "\ue000katex-formula-0\ue001 \\(x^2\\) \\(y^2\\)"
+
+        rendered = str(render_markdown(source))
+
+        self.assertIn("\ue000katex-formula-0\ue001", rendered)
+        self.assertIn(r"\(x^2\)", rendered)
+        self.assertIn(r"\(y^2\)", rendered)
 
 
 class UserQuestionListTests(PublicPageTests):
