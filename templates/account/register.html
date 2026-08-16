@@ -1,11 +1,466 @@
 {% extends "base.html" %}
-{% block title %}注册{% endblock %}
+{% load static %}
+{% block title %}注册 · 全息真题库{% endblock %}
 {% block content %}
-<div class="mx-auto question-card p-4" style="max-width: 32rem">
-  <h1 class="h3 mb-3">注册</h1>
-  <form method="post">
-    {% csrf_token %}{{ form.as_p }}
-    <button class="btn btn-primary" type="submit">创建账号</button>
-  </form>
+<div class="auth-wrapper">
+  <!-- 背景装饰环 -->
+  <div class="auth-bg-rings" aria-hidden="true">
+    <div class="ring ring-1"></div>
+    <div class="ring ring-2"></div>
+    <div class="ring ring-3"></div>
+  </div>
+
+  <div class="holo-card">
+    <div class="scan-line"></div>
+
+    <!-- 角落装饰 -->
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <div class="auth-logo">
+      <h1 class="glitch-text" data-text="HOLO BANK">◈ HOLO BANK ◈</h1>
+      <p class="typewriter">创建你的专属密钥</p>
+    </div>
+
+    <h2 class="auth-title">
+      <span class="title-line"></span>
+      新用户注册
+      <span class="title-line"></span>
+    </h2>
+
+    <form method="post" class="auth-form">
+      {% csrf_token %}
+      {{ form.as_p }}
+      <button class="btn btn-primary auth-submit" type="submit">
+        <span class="btn-text">创 建 账 号</span>
+        <span class="btn-glow"></span>
+      </button>
+    </form>
+
+    <div class="auth-footer">
+      <span class="footer-divider">───────</span>
+      已有密钥？<a href="{% url 'accounts:login' %}">立即登录</a>
+      <span class="footer-divider">───────</span>
+    </div>
+
+    <!-- 底部状态栏 -->
+    <div class="auth-status-bar">
+      <span class="status-dot"></span>
+      <span>SYSTEM READY</span>
+      <span class="status-dot"></span>
+    </div>
+  </div>
 </div>
+
+<style>
+  /* ========== 背景装饰环 ========== */
+  .auth-wrapper { position: relative; overflow: hidden; }
+
+  .auth-bg-rings {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    max-width: 600px;
+    max-height: 600px;
+    pointer-events: none;
+  }
+
+  .ring {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    border-radius: 50%;
+    border: 1px solid transparent;
+    transform: translate(-50%, -50%);
+  }
+
+  .ring-1 {
+    width: 80%; height: 80%;
+    border-color: rgba(139, 92, 246, 0.15);
+    animation: ring-pulse 4s ease-in-out infinite;
+  }
+  .ring-2 {
+    width: 60%; height: 60%;
+    border-color: rgba(6, 182, 212, 0.2);
+    animation: ring-pulse 4s ease-in-out 0.5s infinite;
+  }
+  .ring-3 {
+    width: 40%; height: 40%;
+    border-color: rgba(236, 72, 153, 0.2);
+    animation: ring-pulse 4s ease-in-out 1s infinite;
+  }
+
+  @keyframes ring-pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.3; }
+    50% { transform: translate(-50%, -50%) scale(1.08); opacity: 0.6; }
+  }
+
+  /* ========== 角落装饰 ========== */
+  .corner {
+    position: absolute;
+    width: 24px; height: 24px;
+    border: 2px solid var(--accent-cyan);
+    opacity: 0.6;
+  }
+  .corner-tl { top: 12px; left: 12px; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+  .corner-tr { top: 12px; right: 12px; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
+  .corner-bl { bottom: 12px; left: 12px; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
+  .corner-br { bottom: 12px; right: 12px; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+
+  /* ========== 入场动画 ========== */
+  .auth-wrapper .holo-card {
+    opacity: 0;
+    transform: translateY(20px);
+    animation:
+      holo-enter 1s cubic-bezier(0.23, 1, 0.32, 1) 0.3s forwards,
+      holo-float 6s ease-in-out 1.5s infinite;
+  }
+
+  @keyframes holo-enter {
+    0% { opacity: 0; transform: translateY(40px) scale(0.9); filter: blur(15px); }
+    40% { opacity: 0.5; filter: blur(5px); }
+    70% { filter: blur(0); }
+    100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  }
+
+  /* ========== Logo 故障文字 ========== */
+  .glitch-text {
+    position: relative;
+    animation: glitch-in 1s ease 0.8s both;
+  }
+
+  @keyframes glitch-in {
+    0% { opacity: 0; transform: translateY(-10px); clip-path: inset(0 0 100% 0); }
+    50% { opacity: 1; clip-path: inset(0 0 0 0); }
+    55% { transform: translateX(-2px); }
+    60% { transform: translateX(2px); }
+    65% { transform: translateX(-1px); }
+    70% { transform: translateX(1px); }
+    75% { transform: translateX(0); }
+    100% { opacity: 1; transform: translateX(0); }
+  }
+
+  .glitch-text::before,
+  .glitch-text::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    opacity: 0;
+  }
+
+  .glitch-text:hover::before {
+    left: 2px;
+    text-shadow: -1px 0 var(--accent-pink);
+    animation: glitch-anim 2s infinite linear alternate-reverse;
+    opacity: 0.7;
+    -webkit-text-fill-color: transparent;
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+  }
+
+  .glitch-text:hover::after {
+    left: -2px;
+    text-shadow: -1px 0 var(--accent-cyan);
+    animation: glitch-anim2 3s infinite linear alternate-reverse;
+    opacity: 0.7;
+    -webkit-text-fill-color: transparent;
+    background: none;
+    -webkit-background-clip: initial;
+    background-clip: initial;
+  }
+
+  @keyframes glitch-anim {
+    0% { clip-path: inset(10% 0 85% 0); }
+    20% { clip-path: inset(60% 0 20% 0); }
+    40% { clip-path: inset(30% 0 50% 0); }
+    60% { clip-path: inset(80% 0 5% 0); }
+    80% { clip-path: inset(15% 0 70% 0); }
+    100% { clip-path: inset(45% 0 35% 0); }
+  }
+  @keyframes glitch-anim2 {
+    0% { clip-path: inset(70% 0 10% 0); }
+    25% { clip-path: inset(20% 0 60% 0); }
+    50% { clip-path: inset(50% 0 30% 0); }
+    75% { clip-path: inset(5% 0 80% 0); }
+    100% { clip-path: inset(40% 0 45% 0); }
+  }
+
+  /* ========== 打字机副标题 ========== */
+  .typewriter {
+    overflow: hidden;
+    white-space: nowrap;
+    border-right: 2px solid var(--accent-cyan);
+    width: 0;
+    animation:
+      typing 2.5s steps(8) 1.2s forwards,
+      blink-caret 0.7s step-end infinite;
+    display: inline-block;
+  }
+
+  @keyframes typing { from { width: 0; } to { width: 100%; } }
+  @keyframes blink-caret { from, to { border-color: transparent; } 50% { border-color: var(--accent-cyan); } }
+
+  .auth-logo {
+    opacity: 0;
+    animation: fade-up 0.6s ease 0.6s forwards;
+    text-align: center;
+  }
+
+  .auth-title {
+    opacity: 0;
+    animation: fade-up 0.6s ease 1.6s forwards;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  .title-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-glow), transparent);
+    max-width: 60px;
+  }
+
+  .holo-card form {
+    opacity: 0;
+    animation: fade-up 0.6s ease 1.8s forwards;
+  }
+
+  .auth-footer {
+    opacity: 0;
+    animation: fade-up 0.6s ease 2s forwards;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .footer-divider {
+    color: var(--border-color);
+    font-size: 0.75rem;
+  }
+
+  @keyframes fade-up {
+    0% { opacity: 0; transform: translateY(12px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ========== 输入框动效 ========== */
+  .holo-card form p { position: relative; margin-bottom: 1.25rem; }
+
+  .holo-card form p input[type="text"],
+  .holo-card form p input[type="password"] {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.9rem 1rem;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+    width: 100%;
+    color: var(--text-primary);
+    position: relative;
+  }
+
+  .holo-card form p input:focus {
+    border-color: var(--accent-cyan);
+    box-shadow:
+      0 0 0 3px rgba(6, 182, 212, 0.15),
+      0 0 25px rgba(6, 182, 212, 0.25);
+    transform: translateY(-1px);
+    outline: none;
+  }
+
+  .holo-card form p::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    width: 0;
+    height: 2px;
+    background: var(--accent-gradient);
+    transition: all 0.3s ease;
+    transform: translateX(-50%);
+    border-radius: 0 0 var(--radius-md) var(--radius-md);
+    opacity: 0;
+  }
+
+  .holo-card form p:focus-within::after {
+    width: calc(100% - 4px);
+    opacity: 1;
+  }
+
+  .holo-card form p label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    margin-bottom: 0.5rem;
+    transition: all 0.3s ease;
+  }
+
+  .holo-card form p:focus-within label {
+    color: var(--accent-cyan);
+    letter-spacing: 2px;
+  }
+
+  /* ========== 按钮动效 ========== */
+  .auth-submit {
+    width: 100%;
+    padding: 0.9rem;
+    font-size: 1rem;
+    font-weight: 600;
+    letter-spacing: 3px;
+    border-radius: var(--radius-md);
+    margin-top: 0.5rem;
+    position: relative;
+    overflow: hidden;
+    border: none;
+    cursor: pointer;
+  }
+
+  .auth-submit::before {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    background: conic-gradient(
+      from 0deg,
+      var(--accent-purple), var(--accent-cyan), var(--accent-pink), var(--accent-purple)
+    );
+    z-index: 0;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    animation: border-rotate 3s linear infinite;
+  }
+
+  .auth-submit:hover::before { opacity: 1; }
+
+  .auth-submit::after {
+    content: "";
+    position: absolute;
+    inset: 1px;
+    background: var(--accent-gradient);
+    border-radius: calc(var(--radius-md) - 1px);
+    z-index: 0;
+  }
+
+  .btn-text { position: relative; z-index: 1; }
+
+  .btn-glow {
+    position: absolute;
+    top: 50%; left: 50%;
+    width: 100%; height: 100%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  .auth-submit:hover .btn-glow {
+    opacity: 1;
+    animation: btn-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes btn-pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.5; }
+    50% { transform: translate(-50%, -50%) scale(1.2); opacity: 0.2; }
+  }
+
+  .auth-submit:active { transform: scale(0.98); }
+
+  /* ========== 底部状态栏 ========== */
+  .auth-status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    margin-top: 1.5rem;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    opacity: 0;
+    animation: fade-up 0.6s ease 2.2s forwards;
+  }
+
+  .status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: status-blink 2s ease-in-out infinite;
+  }
+
+  @keyframes status-blink {
+    0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--success); }
+    50% { opacity: 0.4; box-shadow: 0 0 4px var(--success); }
+  }
+
+  /* ========== 扫描线 ========== */
+  .scan-line {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%, var(--accent-cyan) 20%, var(--accent-purple) 50%, var(--accent-pink) 80%, transparent 100%
+    );
+    opacity: 0.6;
+    animation: scan-down 4s ease-in-out infinite;
+    pointer-events: none;
+    z-index: 5;
+    box-shadow: 0 0 10px var(--accent-cyan), 0 0 20px var(--accent-purple);
+    filter: blur(0.5px);
+  }
+
+  @keyframes scan-down {
+    0% { top: 0; opacity: 0; }
+    5% { opacity: 0.7; }
+    95% { opacity: 0.7; }
+    100% { top: 100%; opacity: 0; }
+  }
+
+  /* ========== 卡片呼吸光晕 ========== */
+  .holo-card { position: relative; }
+
+  .holo-card::after {
+    content: "";
+    position: absolute;
+    top: -40%; left: -20%; right: -20%;
+    height: 60%;
+    background: radial-gradient(ellipse at center, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+    animation: aura-breath 5s ease-in-out infinite;
+  }
+
+  @keyframes aura-breath {
+    0%, 100% { opacity: 0.5; transform: translateY(0); }
+    50% { opacity: 1; transform: translateY(-5px); }
+  }
+
+  /* ========== 减少动画模式 ========== */
+  @media (prefers-reduced-motion: reduce) {
+    .auth-wrapper .holo-card, .auth-logo, .auth-title,
+    .holo-card form, .auth-footer, .auth-status-bar {
+      animation: none; opacity: 1; transform: none;
+    }
+    .ring { animation: none; }
+    .typewriter { width: 100%; animation: none; border-right: none; }
+    .status-dot { animation: none; }
+    .glitch-text { animation: none; }
+    .scan-line { animation: none; display: none; }
+    .holo-card::after { animation: none; }
+  }
+</style>
 {% endblock %}

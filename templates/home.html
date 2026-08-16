@@ -1,21 +1,30 @@
 {% extends "base.html" %}
 {% block content %}
-<section class="py-5 text-center">
-  <p class="text-secondary mb-2">仅收录第1至17届非数学A类范围</p>
-  <h1 class="display-6 fw-bold mb-4">初赛、决赛真题与详细解析</h1>
-  <form action="{% url 'search' %}" method="get" class="row g-2 justify-content-center">
-    <div class="col-12 col-md-7">{{ filter_form.q }}</div>
-    <div class="col-auto"><button class="btn btn-primary" type="submit">搜题</button></div>
+<section class="hero-section">
+  <p class="hero-subtitle">第 1 — 17 届 · 非数学 A 类</p>
+  <h1 class="hero-title">
+    初赛、决赛真题<br><span class="accent">与详细解析</span>
+  </h1>
+  <form action="{% url 'search' %}" method="get" class="hero-search row g-0">
+    <div class="col" style="flex:1">
+      {{ filter_form.q }}
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-primary" type="submit">搜 索</button>
+    </div>
   </form>
-  <div class="d-flex justify-content-center gap-2 mt-3">
+  <div class="hero-shortcuts">
     <a class="btn btn-outline-primary" href="{% url 'paper-list' %}?stage=preliminary">初赛真题</a>
     <a class="btn btn-outline-primary" href="{% url 'paper-list' %}?stage=final">决赛真题</a>
   </div>
 </section>
-<section aria-labelledby="edition-title">
-  <h2 id="edition-title" class="h5 mb-3">按届数查看</h2>
-  <div class="d-flex flex-wrap gap-2">
-    {% for number in editions %}<a class="btn btn-outline-secondary" href="{% url 'paper-list' %}?edition={{ number }}">第{{ number }}届</a>{% endfor %}
+
+<section class="edition-section" aria-labelledby="edition-title">
+  <h2 id="edition-title">按 届 数 查 看</h2>
+  <div class="edition-grid">
+    {% for number in editions %}
+      <a class="btn btn-outline-secondary" href="{% url 'paper-list' %}?edition={{ number }}">第{{ number }}届</a>
+    {% endfor %}
   </div>
 </section>
 {% endblock %}

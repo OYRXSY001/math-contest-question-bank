@@ -1,0 +1,4 @@
+<!-- KaTeX 公式渲染组件 -->
+<view class="formula-render" style="{{containerStyle}}">
+  <rich-text nodes="{{nodes}}" />
+</view>

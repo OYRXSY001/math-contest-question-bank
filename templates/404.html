@@ -1,3 +1,12 @@
 {% extends "base.html" %}
-{% block title %}页面不存在{% endblock %}
-{% block content %}<h1 class="h2">页面不存在</h1><p><a href="{% url 'paper-list' %}">返回真题库</a>或<a href="{% url 'search' %}">搜索题目</a>。</p>{% endblock %}
+{% block title %}404 · 信号丢失{% endblock %}
+{% block content %}
+<div style="text-align:center; padding: 4rem 1rem;">
+  <h1 style="font-size: clamp(3rem, 12vw, 6rem); font-weight: 700; margin: 0; line-height: 1; background: var(--accent-gradient); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;">404</h1>
+  <p style="color: var(--text-muted); font-size: 1.1rem; margin: 1.5rem 0 2rem; letter-spacing: 2px;">信 号 丢 失 · 页 面 不 存 在</p>
+  <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+    <a class="btn btn-primary" href="{% url 'paper-list' %}">返回真题库</a>
+    <a class="btn btn-outline-primary" href="{% url 'search' %}">搜索题目</a>
+  </div>
+</div>
+{% endblock %}

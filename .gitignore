@@ -14,3 +14,9 @@ data/review/*
 !data/review/.gitkeep
 *.log
 
+
+# local tooling / stray files
+.workbuddy/
+3.1
+新建文件夹/
+svg

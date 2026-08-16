@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ paper.title }}{% endblock %}
 {% block content %}
-<header class="mb-4">
-  <p class="text-secondary mb-2">第{{ paper.edition }}届 · {{ paper.get_stage_display }} · {{ paper.original_category_label }}</p>
-  <div class="d-flex flex-wrap justify-content-between gap-3">
-    <h1 class="h2">{{ paper.title }}</h1>
+<header class="paper-header">
+  <p class="paper-meta">第{{ paper.edition }}届 · {{ paper.get_stage_display }} · {{ paper.original_category_label }}</p>
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3">
+    <h1>{{ paper.title }}</h1>
     {% if paper.pdf_file %}
       <a class="btn btn-outline-primary" href="{% url 'paper-download' paper.pk %}">下载 PDF</a>
     {% endif %}
