@@ -7,6 +7,8 @@
 本项目是面向全国大学生数学竞赛（非数学类 A/B）的真题题库系统，提供 **Web 网站**与**微信小程序**两个端：
 
 - **Web 端（Django）**：在线浏览第 1–17 届初赛/决赛真题试卷与解析，公式使用 KaTeX 渲染，支持下载试卷 PDF，后台支持按届导入与管理题库数据。
+- <img width="1919" height="929" alt="image" src="https://github.com/user-attachments/assets/9c3b22bc-fde6-4485-9aaf-77cd7e812e33" />
+
 - **小程序端（mini-program/）**：微信小程序版题库，内置题目数据与公式渲染组件，支持按试卷、知识点分类浏览和关键词搜索。
 
 ## ✨ 功能特性
